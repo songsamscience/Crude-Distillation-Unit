@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>송쌤과학 - 원유의 분별 증류</title>
+<!-- 가독성이 높은 Pretendard 폰트 적용 -->
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; touch-action: none; font-family: 'Pretendard', sans-serif; }
+body {
+    --bg: #0d131f; --bg2: #141d2b; --bg3: #1c2838; --card: rgba(20, 30, 45, 0.9); 
+    --tx: #e0e6ed; --tx2: #8a9fb8; --tx3: #4a6585; --acc: #ff8828; --acc2: #ff6810; 
+    --bdr: rgba(100, 150, 255, 0.2); --bdr2: rgba(100, 150, 255, 0.05); --shd: rgba(0, 0, 0, 0.6); 
+    --fi: #182333; background: var(--bg); color: var(--tx); transition: background .4s, color .4s;
+}
+body.light {
+    --bg: #ebe7de; --bg2: #f2efe9; --bg3: #fcfbfa; --card: rgba(255, 255, 255, 0.95); 
+    --tx: #222222; --tx2: #666666; --tx3: #888888; --acc: #e66000; --acc2: #cc5000; 
+    --bdr: rgba(0, 0, 0, 0.15); --bdr2: rgba(0, 0, 0, 0.04); --shd: rgba(0, 0, 0, 0.1); 
+    --fi: #e3dec9; background: var(--bg); color: var(--tx);
+}
+#app {
+    position: relative; width: 100%; height: 100%; max-width: 1100px; max-height: 660px;
+    aspect-ratio: 1100 / 660; background: transparent; overflow: hidden;
+    box-shadow: 0 15px 60px var(--shd); border-radius: 12px;
+}
+@media (max-aspect-ratio: 1100/660) { #app { height: auto; } }
+@media (min-aspect-ratio: 1100/660) { #app { width: auto; } }
+canvas { display: block; width: 100%; height: 100%; }
+
+/* 온도 입력창 스타일 */
+#tempInp {
+    position: absolute;
+    /* 캔버스 기준 비율로 위치 지정 (x:380, y:575, w:140, h:40) */
+    left: 34.545%; top: 87.121%; width: 12.727%; height: 6.060%;
+    background: var(--card);
+    border: 2.5px solid #2070d0;
+    border-radius: 8px;
+    color: #2070d0;
+    text-align: center;
+    font-size: 24px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    outline: none;
+    z-index: 10;
+    transition: border-color 0.3s, color 0.3s, background 0.3s;
+}
+#tempInp::-webkit-outer-spin-button,
+#tempInp::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+}
+#tempInp:focus { box-shadow: 0 0 10px rgba(32, 112, 208, 0.5); }
+
+/* 모달 스타일 */
+.ov {
+    position: absolute; inset: 0; background: rgba(0, 0, 0, 0.7); display: none; 
+    justify-content: center; align-items: center; z-index: 99; backdrop-filter: blur(8px);
+    opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+}
+.ov.show { opacity: 1; pointer-events: auto; }
+.dg {
+    background: var(--card); border: 1px solid var(--bdr); padding: 40px; border-radius: 24px; 
+    text-align: center; max-width: 500px; min-width: 320px; box-shadow: 0 25px 80px var(--shd);
+    transform: translateY(20px); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.ov.show .dg { transform: translateY(0); }
+.dg h2 { font-size: 24px; font-weight: 800; margin-bottom: 20px; color: var(--acc); }
+.dg p { white-space: pre-line; line-height: 1.7; color: var(--tx); font-size: 15px; font-weight: 500; margin-bottom: 28px; text-align: left; }
+.dg button {
+    padding: 14px 45px; background: var(--acc); color: #fff; border: none; border-radius: 12px; 
+    font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.dg button:hover { background: var(--acc2); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255, 104, 16, 0.4); }
+.dg button:active { transform: translateY(1px); }
+</style>
+</head>
+<body>
+<div id="app">
+    <canvas id="cv" width="1100" height="660"></canvas>
+    <!-- 직접 타이핑 가능한 온도 입력창 -->
+    <input type="number" id="tempInp" min="0" max="450" value="0">
+    <div id="ov" class="ov">
+        <div class="dg">
+            <h2>🧪 원유의 분별 증류 가상실험</h2>
+            <p id="mg"></p>
+            <button onclick="clD()">실험 시작하기</button>
+        </div>
+    </div>
+</div>
+<script>
+const cv = document.getElementById('cv'), X = cv.getContext('2d'), W = 1100, H = 660;
+const tInp = document.getElementById('tempInp');
+let dk = true, aT = 0;
+
+/* ═══ 레이아웃 및 구역 설정 (겹침 방지 및 중앙 정렬 최적화) ═══ */
+const FN = {x: 130, y: 330, w: 225, h: 225}; // 가열로 (좌측으로 이동)
+const TW = {x: 550, y: 48, w: 210, h: 505};  // 증류탑 (우측으로 이동)
+const TRAY_GAP = 48; // 증류탑 내 이동 통로 너비
+
+/* ═══ UI 버튼 영역 (가열로와 증류탑 사이 중앙 배열) ═══ */
+const BT = {
+    inj: {x: 380, y: 300, w: 140, h: 48}, // 원유 주입
+    rst: {x: 380, y: 360, w: 140, h: 36}, // 초기화
+    tp:  {x: 380, y: 410, w: 140, h: 32}, // 온도분포 토글
+    rf:  {x: 380, y: 455, w: 140, h: 32}, // 환류표시 토글
+    tup: {x: 380, y: 535, w: 140, h: 35}, // 온도 상승 (파이프 아래 위치)
+    tdn: {x: 380, y: 620, w: 140, h: 35}, // 온도 하강
+    thm: {x: 970, y: 15, w: 110, h: 35}, // 다크/라이트 모드
+    ful: {x: 970, y: 58, w: 110, h: 35}  // 전체화면
+};
+const TBOX = {x: 380, y: 575, w: 140, h: 40}; // 라벨 표시를 위한 위치 참조
+
+/* ═══ 8개 층 분리 정보 ═══ */
+const F = [
+  {nm:'석유 가스', s:'석유 가스', bp0:-42, bp1:20, col:'#dcb020', C:'C₁~C₄', tr:'20℃', nfo:'끓는점 ~20℃', use:'가정·식당 LPG 연료\nLPG 자동차 연료', mol:'분자 매우 작음\n상온에서 기체 상태'},
+  {nm:'휘발유', s:'휘발유', bp0:30, bp1:120, col:'#e04840', C:'C₅~C₉', tr:'30℃', nfo:'끓는점 30~120℃', use:'승용차 가솔린 연료\n경비행기 연료', mol:'탄소 5~9개\n휘발성 높음'},
+  {nm:'나프타', s:'나프타', bp0:70, bp1:180, col:'#d07828', C:'C₅~C₁₂', tr:'110℃', nfo:'끓는점 70~180℃', use:'석유화학 원료\n플라스틱·합성섬유', mol:'탄소 5~12개\n화학공업 원료'},
+  {nm:'등유', s:'등유', bp0:170, bp1:250, col:'#6050c0', C:'C₁₂~C₁₆', tr:'180℃', nfo:'끓는점 170~250℃', use:'제트기 연료\n보일러 난방', mol:'탄소 12~16개\n안정적 연소'},
+  {nm:'경유', s:'경유', bp0:250, bp1:340, col:'#2070d0', C:'C₁₅~C₂₀', tr:'260℃', nfo:'끓는점 250~340℃', use:'디젤차·트럭·버스\n중장비 연료', mol:'탄소 15~20개\n점성 증가'},
+  {nm:'윤활유', s:'윤활유', bp0:300, bp1:380, col:'#18a068', C:'C₂₀~C₃₀', tr:'280℃', nfo:'끓는점 300~380℃', use:'기계·엔진 윤활유\n그리스 원료', mol:'탄소 20~30개\n높은 점성'},
+  {nm:'중유', s:'중유', bp0:340, bp1:420, col:'#c02010', C:'C₃₀~C₄₀', tr:'340℃', nfo:'끓는점 340~420℃', use:'대형 선박 연료\n발전소 보일러', mol:'탄소 30~40개\n매우 무거움'},
+  {nm:'잔류물', s:'잔류물', bp0:450, bp1:900, col:'#604028', C:'C₄₀↑', tr:'', nfo:'미기화 잔류물', use:'아스팔트 포장재\n방수재·코팅재', mol:'탄소 40개 이상\n450℃에서도 기화 안됨'}
+];
+const LH = TW.h / F.length;
+F.forEach((f, i) => { f.yt = TW.y + i * LH; f.yb = TW.y + (i + 1) * LH; f.dy = f.yt + LH / 2; f.bx = TW.x + TW.w + 115; f.by = f.dy - 16; });
+
+/* ═══ 상태 관리 (State) ═══ */
+let cT = 0, tT = 0, done = false, ejN = 0;
+let isTUp = false, isTDn = false;
+let pts = [], rfxUp = [], rfxDn = [];
+let showTP = true, showRF = false;
+let pDr = null, dFr = null, isDrF = false, dsx = 0, dsy = 0, mx = 0, my = 0, aLbl = null;
+let truck = { x: -200, y: 540, st: 'idle', tk: 0, cnt: 0 }; 
+
+/* ═══ 캐싱 및 유틸리티 ═══ */
+const bgCanvas = document.createElement('canvas'); bgCanvas.width = W; bgCanvas.height = H;
+const bgX = bgCanvas.getContext('2d');
+let bgCached = false;
+
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
+function hit(p,r){return p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h}
+function cv2(v){return getComputedStyle(document.body).getPropertyValue(v).trim()}
+function nr(m,s){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.max(m-s*3,Math.min(m+s*3,Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)*s+m))}
+
+function drawTextBg(ctx, txt, x, y, bgCol, txtCol, font, pad = 6) {
+    ctx.font = font;
+    const w = ctx.measureText(txt).width;
+    const h = parseInt(font, 10);
+    ctx.fillStyle = bgCol;
+    rr(ctx, x - w/2 - pad, y - h + pad/2, w + pad*2, h + pad, 6);
+    ctx.fill();
+    ctx.fillStyle = txtCol;
+    ctx.textAlign = 'center';
+    ctx.fillText(txt, x, y);
+}
+
+/* ═══ 파티클 (원유 분자) ═══ */
+const NP = 400; // 입자 수 대폭 증가
+class Pt {
+  constructor(sx, sy, st='inj'){
+    const i = Math.floor(Math.random() * F.length);
+    this.f = F[i];
+    const m = (this.f.bp0 + this.f.bp1) / 2, s = (this.f.bp1 - this.f.bp0) / 6;
+    this.bp = nr(m, s); this.st = st; this.tk = 0;
+    
+    // 분자량(배열 인덱스)에 비례하여 입자 크기 설정 (가벼운 가스=작음, 무거운 잔류물=큼)
+    this.sz = 1.5 + (i * 0.5) + Math.random(); 
+
+    if(st === 'inj'){ this.x = sx; this.y = sy; this.vx = 4.0 + Math.random() * 2.5; this.vy = (Math.random() - .5) * 1; }
+    else { this.x = FN.x + 25 + Math.random() * (FN.w - 50); this.y = FN.y + 45 + Math.random() * (FN.h - 60); this.vx = (Math.random() - .5) * 2; this.vy = (Math.random() - .5) * 2; }
+  }
+  update(){
+    this.tk++;
+    const bx = FN.x + 12, by = FN.y + 34, bw = FN.w - 24, bh = FN.h - 46;
+    switch(this.st){
+    case 'inj':
+      this.x += this.vx; this.y += this.vy;
+      if(this.x > FN.x + 18 + Math.random() * 25){ this.st = 'fur'; this.vx = (Math.random() - .5) * 2; this.vy = (Math.random() - .5) * 2; this.tk = 0; }
+      break;
+    case 'fur':{
+      let sp = 1 + cT / 100;
+      this.x += this.vx * sp; this.y += this.vy * sp;
+      if(this.x < bx){ this.x = bx; this.vx = Math.abs(this.vx); }
+      if(this.x > bx + bw){ this.x = bx + bw; this.vx = -Math.abs(this.vx); }
+      if(this.y < by){ this.y = by; this.vy = Math.abs(this.vy); }
+      if(this.y > by + bh){ this.y = by + bh; this.vy = -Math.abs(this.vy); }
+      
+      if(cT >= this.bp || (this.f.nm === '잔류물' && cT >= 350)){
+        if(this.x > bx + bw - 40 && this.y > by + bh - 50){ this.st = 'ph'; this.tk = 0; }
+      }
+      break;
+    }
+    case 'ph':
+      this.x += 4.5; this.y += (515 - this.y) * 0.15;
+      if(this.x >= TW.x + TRAY_GAP / 2){ this.st = 'rise'; }
+      break;
+    case 'rise':
+      if(cT < this.bp || this.f.nm === '잔류물'){
+        this.f = F[F.length - 1]; 
+        this.y += 2.5; 
+        if(this.y >= this.f.dy){ this.y = this.f.dy; this.st = 'settle'; this.tk = 0; }
+      } else {
+        this.y -= 3.5;
+        if(this.y <= this.f.dy){ this.y = this.f.dy; this.st = 'settle'; this.tk = 0; }
+      }
+      this.x += (Math.random() - .5) * 1.5;
+      this.x = Math.max(TW.x + 6, Math.min(TW.x + TRAY_GAP - 6, this.x));
+      break;
+    case 'settle':
+      this.x += (Math.random() - .5) * 1.2; this.y += (this.f.dy - this.y) * .1;
+      this.x = Math.max(TW.x + 6, Math.min(TW.x + TW.w / 2 + 15, this.x));
+      if(this.tk > 22){ this.st = 'tray'; this.tk = 0; }
+      break;
+    case 'tray':
+      this.x += 2.3; this.y += (this.f.dy - this.y) * .12;
+      if(this.x > TW.x + TW.w - 5) this.st = 'out'; break;
+    case 'out':
+      this.x += 3; this.y += (Math.random() - .5) * .3;
+      if(this.x >= TW.x + TW.w + 78) this.st = 'ej'; break;
+    case 'ej':
+      this.x += 4; if(this.x > W + 15){ this.st = 'dn'; ejN++; } break;
+    }
+  }
+  draw(ctx){
+    if(this.st === 'dn') return;
+    const cl = this.f.col;
+    if(this.st === 'enter' || this.st === 'settle' || this.st === 'rise'){ ctx.fillStyle = cl + '40'; ctx.beginPath(); ctx.arc(this.x, this.y, this.sz + 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = cl; ctx.beginPath(); ctx.arc(this.x, this.y, this.sz, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(this.x - this.sz * .28, this.y - this.sz * .28, this.sz * .3, 0, Math.PI * 2); ctx.fill();
+    if((this.st === 'settle' || this.st === 'rise') && (aT * 12 | 0) % 2){ ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = .6; ctx.beginPath(); ctx.arc(this.x, this.y, this.sz + 1.5, 0, Math.PI * 2); ctx.stroke(); }
+  }
+}
+
+class RfxRise {
+  constructor(){ this.x = TW.x + 15 + Math.random() * 25; this.y = TW.y + TW.h - 20; this.l = 80 + Math.random() * 60; this.ml = this.l; this.sp = .8 + Math.random() * .6; }
+  update(){ this.y -= this.sp; this.x += (Math.random() - .5) * 1.2; this.x = Math.max(TW.x + 8, Math.min(TW.x + TRAY_GAP, this.x)); this.l--; }
+  draw(ctx){ const a = (this.l / this.ml) * .5; ctx.fillStyle = `rgba(220,80,30,${a})`; ctx.beginPath(); ctx.arc(this.x, this.y, 1.8, 0, Math.PI * 2); ctx.fill(); }
+}
+class RfxFall {
+  constructor(){ this.x = TW.x + TW.w - 15 - Math.random() * 40; this.y = TW.y + 20; this.l = 80 + Math.random() * 60; this.ml = this.l; this.sp = .6 + Math.random() * .4; }
+  update(){ this.y += this.sp; this.x += (Math.random() - .5) * 1; this.x = Math.max(TW.x + TRAY_GAP + 10, Math.min(TW.x + TW.w - 6, this.x)); this.l--; }
+  draw(ctx){ const a = (this.l / this.ml) * .4; ctx.fillStyle = `rgba(40,100,210,${a})`; ctx.beginPath(); ctx.arc(this.x, this.y, 1.6, 0, Math.PI * 2); ctx.fill(); }
+}
+
+function reset(){ cT = 0; tT = 0; done = false; ejN = 0; pts = []; rfxUp = []; rfxDn = []; aLbl = null; truck.st = 'idle'; truck.x = -200; tInp.value = 0; }
+function callTruck(){ 
+    if(truck.st === 'idle' || truck.st === 'out') { 
+        truck.st = 'in'; truck.x = -200; truck.tk = 0; truck.cnt = 0; 
+        ejN = 0; done = false; pts = []; 
+    } 
+}
+function updateTruck() {
+    if(truck.st === 'in') {
+        truck.x += 5.5;
+        if(truck.x >= FN.x - 120) { truck.x = FN.x - 120; truck.st = 'pour'; truck.tk = 0; }
+    } else if(truck.st === 'pour') {
+        truck.tk++;
+        // 1프레임당 여러개의 파티클 생성하여 양을 풍부하게
+        if(truck.tk % 1 === 0 && truck.cnt < NP) {
+            pts.push(new Pt(FN.x - 45, truck.y - 12, 'inj'));
+            pts.push(new Pt(FN.x - 45, truck.y - 10, 'inj'));
+            pts.push(new Pt(FN.x - 45, truck.y - 14, 'inj'));
+            truck.cnt += 3;
+        }
+        if(truck.tk > 160) { truck.st = 'out'; }
+    } else if(truck.st === 'out') {
+        truck.x -= 4.5;
+        if(truck.x < -200) truck.st = 'idle';
+    }
+}
+
+function intro(){ showD(
+  "1. '🛢️ 원유 주입'으로 유조차를 불러 원유를 넣으세요.\n\n"+
+  "2. 온도를 직접 타이핑하거나 [▲/▼] 버튼을 눌러 조절하세요.\n\n"+
+  "3. 끓는점에 도달한 성분이 기화되어 파이프를 통해 증류탑 위로 분리됩니다.\n\n"+
+  "4. 무거운 성분(잔류물)은 기화되지 않고 아래쪽으로 분리됩니다.\n\n"+
+  "5. 이름표를 드래그하여 각 층의 물리적 상태(기체/액체)를 관찰하세요.\n\n"+
+  "6. '🔄 환류 표시'로 순도를 높이는 기액 접촉 원리를 확인하세요.",
+  ()=>{}
+);}
+
+/* ═══ 이벤트 핸들링 ═══ */
+function init(){
+    reset(); window.addEventListener('resize', () => bgCached = false);
+    cv.addEventListener('mousedown', oD); cv.addEventListener('mousemove', oM); window.addEventListener('mouseup', oU);
+    cv.addEventListener('touchstart', oD, {passive:false}); cv.addEventListener('touchmove', oM, {passive:false}); window.addEventListener('touchend', oU);
+    
+    // 온도 입력창 이벤트
+    tInp.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value) || 0;
+        if(val > 450) val = 450;
+        if(val < 0) val = 0;
+        tT = val;
+    });
+
+    loop(); intro();
+}
+function gp(e){const r=cv.getBoundingClientRect();let x=e.clientX,y=e.clientY;if(e.touches&&e.touches.length){x=e.touches[0].clientX;y=e.touches[0].clientY;e.preventDefault()}return{x:(x-r.left)*(W/r.width),y:(y-r.top)*(H/r.height)}}
+function oD(e){
+  const p = gp(e);
+  if(hit(p, BT.thm)){ dk = !dk; document.body.classList.toggle('light', !dk); bgCached = false; return; }
+  if(hit(p, BT.ful)){ tFS(); return; } if(hit(p, BT.rst)){ reset(); intro(); return; }
+  if(hit(p, BT.inj)){ callTruck(); return; } 
+  if(hit(p, BT.tp)){ showTP = !showTP; return; } if(hit(p, BT.rf)){ showRF = !showRF; return; }
+  if(hit(p, BT.tup)){ isTUp = true; return; } if(hit(p, BT.tdn)){ isTDn = true; return; }
+  
+  for(let f of F){ if(p.x >= f.bx && p.x <= f.bx + 88 && p.y >= f.by && p.y <= f.by + 30){ pDr = f; dsx = p.x; dsy = p.y; return; } }
+}
+function oM(e){
+  const p = gp(e); 
+  if(pDr && Math.hypot(p.x - dsx, p.y - dsy) > 5){ isDrF = true; dFr = pDr; pDr = null; }
+  if(isDrF){ mx = p.x; my = p.y; return; }
+}
+function oU(){
+  isTUp = false; isTDn = false; 
+  if(pDr){ showD(`[ ${pDr.nm} ]  ${pDr.C}\n끓는점: ${pDr.nfo}\n\n📌 용도\n${pDr.use}\n\n🔬 특징\n${pDr.mol}`); pDr = null; }
+  if(isDrF){ const ins = mx >= TW.x - 12 && mx <= TW.x + TW.w + 12 && my >= TW.y && my <= TW.y + TW.h; if(ins) aLbl = {f: dFr, x: mx, y: my, st: 'f'}; isDrF = false; dFr = null; }
+}
+
+/* ═══ 메인 루프 ═══ */
+function loop(){
+  aT += .016;
+  
+  if(isTUp) tT = Math.min(450, tT + 2.5);
+  if(isTDn) tT = Math.max(0, tT - 2.5);
+  
+  if(cT < tT) cT = Math.min(cT + 2, tT); else if(cT > tT) cT = Math.max(cT - 2, tT);
+  
+  // 입력창과 내부 온도 상태 동기화 (사용자가 타이핑 중이 아닐 때만)
+  if(document.activeElement !== tInp) {
+      tInp.value = Math.floor(tT);
+  }
+
+  updateTruck();
+
+  let ac = 0; pts.forEach(p => { p.update(); if(p.st !== 'dn') ac++; });
+  pts = pts.filter(p => p.st !== 'dn');
+  done = (ac === 0 && ejN > 0 && truck.st === 'idle');
+
+  if(showRF && cT > 100){
+    if(Math.random() < .08) rfxUp.push(new RfxRise());
+    if(Math.random() < .06) rfxDn.push(new RfxFall());
+    rfxUp.forEach(r => r.update()); rfxDn.forEach(r => r.update());
+    rfxUp = rfxUp.filter(r => r.l > 0); rfxDn = rfxDn.filter(r => r.l > 0);
+  }
+
+  if(aLbl){ if(aLbl.st === 'f'){ const d = aLbl.f.dy - aLbl.y; if(Math.abs(d) < 4){ aLbl.y = aLbl.f.dy; aLbl.st = 'r'; }else aLbl.y += Math.sign(d) * 5; } else if(aLbl.st === 'r'){ const tx = aLbl.f.bx + 44, ty = aLbl.f.dy, dx2 = tx - aLbl.x, dy2 = ty - aLbl.y; if(Math.abs(dx2) < 4 && Math.abs(dy2) < 4) aLbl = null; else { aLbl.x += dx2 * .15; aLbl.y += dy2 * .15; } } }
+  
+  render(); requestAnimationFrame(loop);
+}
+
+/* ═══ 렌더링 ═══ */
+function drawStaticCache(){
+  bgX.fillStyle = cv2('--bg2'); bgX.fillRect(0, 0, W, H);
+  bgX.fillStyle = cv2('--bdr2');
+  for(let i = 30; i < W; i += 60) for(let j = 30; j < H; j += 60){ bgX.beginPath(); bgX.arc(i, j, 1.5, 0, Math.PI * 2); bgX.fill(); }
+  
+  // 가열로 외관
+  const x = FN.x, y = FN.y, w = FN.w, h = FN.h;
+  bgX.fillStyle = 'rgba(0,0,0,.25)'; rr(bgX, x+4, y+4, w, h, 12); bgX.fill();
+  const mg = bgX.createLinearGradient(x, y, x+w, y+h);
+  mg.addColorStop(0, dk ? '#2a3848' : '#9aa8b8'); mg.addColorStop(.5, dk ? '#384b60' : '#aab5c5'); mg.addColorStop(1, dk ? '#2a3848' : '#9aa8b8');
+  bgX.fillStyle = mg; rr(bgX, x, y, w, h, 12); bgX.fill();
+  bgX.strokeStyle = dk ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.15)'; bgX.lineWidth = 1.5; rr(bgX, x, y, w, h, 12); bgX.stroke();
+  
+  [15, w-15].forEach(rx => { [20, h-20].forEach(ry => {
+    bgX.fillStyle = dk ? '#1a2430' : '#788898'; bgX.beginPath(); bgX.arc(x+rx, y+ry, 5, 0, Math.PI*2); bgX.fill();
+    bgX.fillStyle = dk ? '#4a5a6a' : '#c8d8e8'; bgX.beginPath(); bgX.arc(x+rx-1, y+ry-1, 2, 0, Math.PI*2); bgX.fill();
+  })});
+  bgX.fillStyle = cv2('--fi'); rr(bgX, x+14, y+32, w-28, h-44, 8); bgX.fill();
+  bgX.strokeStyle = dk ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.08)'; bgX.lineWidth = 2; rr(bgX, x+14, y+32, w-28, h-44, 8); bgX.stroke();
+  
+  bgX.fillStyle = dk ? '#aab8d0' : '#445566'; bgX.font = "800 16px Pretendard"; bgX.textAlign = 'center';
+  bgX.fillText('가열로', x+w/2, y+23);
+  
+  const bg2 = bgX.createLinearGradient(x-8, y+h, x-8, y+h+14);
+  bg2.addColorStop(0, dk ? '#3a4858' : '#8898a8'); bg2.addColorStop(1, dk ? '#1a2434' : '#586878');
+  bgX.fillStyle = bg2; bgX.fillRect(x-8, y+h, w+16, 14);
+  
+  bgX.fillStyle = dk ? '#354555' : '#8898a8'; bgX.fillRect(x-60, y+h-24, 64, 12);
+  bgX.fillStyle = cv2('--tx3'); bgX.font = "800 11px Pretendard"; bgX.textAlign = 'center'; bgX.fillText('주입구', x-28, y+h-30);
+
+  // 파이프 연결 (가열로와 증류탑 위치 변경에 맞춘 좌표)
+  const vx = FN.x + FN.w;
+  drawPipeSegH(bgX, vx - 2, 505, TW.x - vx + 4, 20, 12);
+  bgX.fillStyle = dk ? '#1a2e4a' : '#c8d4e4'; bgX.fillRect(TW.x - 2, 506, 6, 18);
+
+  // 증류탑
+  bgX.fillStyle = 'rgba(0,0,0,.25)'; rr(bgX, TW.x+6, TW.y+6, TW.w, TW.h, 10); bgX.fill();
+  const tg = bgX.createLinearGradient(0, TW.y, 0, TW.y+TW.h);
+  if(dk){ tg.addColorStop(0, '#1a2e4a'); tg.addColorStop(.2, '#203854'); tg.addColorStop(.45, '#3a3425'); tg.addColorStop(.7, '#582818'); tg.addColorStop(1, '#6a1c06'); }
+  else{ tg.addColorStop(0, '#c8d4e4'); tg.addColorStop(.2, '#d4d2c4'); tg.addColorStop(.45, '#dcc0a0'); tg.addColorStop(.7, '#d89860'); tg.addColorStop(1, '#c8481a'); }
+  rr(bgX, TW.x, TW.y, TW.w, TW.h, 10); bgX.fillStyle = tg; bgX.fill();
+  bgX.strokeStyle = dk ? 'rgba(150,180,240,.2)' : 'rgba(0,0,0,.15)'; bgX.lineWidth = 2.5; rr(bgX, TW.x, TW.y, TW.w, TW.h, 10); bgX.stroke();
+  
+  [12, TW.w-12].forEach(rx => { for(let ry=25; ry<TW.h; ry+=LH){
+    bgX.fillStyle = dk ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'; bgX.beginPath(); bgX.arc(TW.x+rx, TW.y+ry, 3, 0, Math.PI*2); bgX.fill();
+  }});
+
+  F.forEach((f, i) => {
+    bgX.fillStyle = f.col + '0f'; bgX.fillRect(TW.x+3, f.yt+1, TW.w-6, f.yb-f.yt-2);
+    if(i < F.length - 1){
+      const by = f.yb;
+      bgX.fillStyle = dk ? 'rgba(160,148,128,.2)' : 'rgba(80,60,40,.15)'; bgX.fillRect(TW.x+TRAY_GAP, by-4, TW.w-TRAY_GAP-6, 7);
+      const nw = 14, gap = 3, off = i % 2 ? 8 : 0;
+      for(let nx = TW.x+TRAY_GAP+off; nx < TW.x+TW.w-7; nx += nw+gap){
+        const bw2 = Math.min(nw, TW.x+TW.w-8-nx); if(bw2 < 3) continue;
+        bgX.fillStyle = dk ? 'rgba(200,180,150,.1)' : 'rgba(60,45,28,.08)'; bgX.fillRect(nx, by-5, bw2, 9);
+      }
+      if(f.tr){ bgX.fillStyle = cv2('--tx2'); bgX.font = "700 10px 'IBM Plex Mono'"; bgX.textAlign = 'right'; bgX.fillText(f.tr, TW.x-6, by+4); }
+    }
+  });
+
+  bgX.strokeStyle = dk ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)'; bgX.lineWidth = 1; bgX.setLineDash([3,5]);
+  bgX.beginPath(); bgX.moveTo(TW.x+TRAY_GAP, TW.y+10); bgX.lineTo(TW.x+TRAY_GAP, TW.y+TW.h-10); bgX.stroke(); bgX.setLineDash([]);
+  bgX.fillStyle = cv2('--tx'); bgX.font = "800 15px Pretendard"; bgX.textAlign = 'center';
+  bgX.fillText('상압증류탑', TW.x+TW.w/2, TW.y+TW.h+20);
+  bgX.fillStyle = cv2('--tx3'); bgX.font = "500 10px 'IBM Plex Mono'";
+  bgX.fillText('Distillation Column', TW.x+TW.w/2, TW.y+TW.h+34);
+
+  // 출력부
+  F.forEach((f, i) => {
+    const px = TW.x+TW.w, py = f.dy;
+    drawPipeSegH(bgX, px-2, py-5, 80, 10, 5);
+    bgX.fillStyle = dk ? '#253550' : '#d0c8b8'; bgX.strokeStyle = cv2('--bdr'); bgX.lineWidth = 1;
+    rr(bgX, px+76, py-10, 24, 20, 5); bgX.fill(); bgX.stroke();
+    
+    bgX.fillStyle = f.col; rr(bgX, f.bx, f.by, 94, 32, 8); bgX.fill();
+    bgX.fillStyle = 'rgba(255,255,255,.08)'; bgX.fillRect(f.bx+1, f.by+1, 92, 15);
+    bgX.strokeStyle = 'rgba(255,255,255,.15)'; bgX.lineWidth = 1; rr(bgX, f.bx, f.by, 94, 32, 8); bgX.stroke();
+    
+    bgX.fillStyle = '#fff'; bgX.font = "800 13px Pretendard"; bgX.textAlign = 'center'; bgX.fillText(f.s, f.bx+47, f.dy+1);
+    bgX.fillStyle = 'rgba(255,255,255,.6)'; bgX.font = "500 9px 'IBM Plex Mono'"; bgX.fillText(f.C, f.bx+47, f.dy+13);
+    bgX.fillStyle = cv2('--tx2'); bgX.font = "700 11px Pretendard"; bgX.textAlign = 'left'; bgX.fillText(f.nfo, f.bx+102, f.dy+4);
+  });
+}
+
+function drawPipeSegH(ctx, x, y, w, pw, iw){
+  const g = ctx.createLinearGradient(0, y, 0, y+pw);
+  g.addColorStop(0, dk ? '#3a4a5a' : '#98a8b8'); g.addColorStop(.5, dk ? '#5a6a7a' : '#b8c8d8'); g.addColorStop(1, dk ? '#3a4a5a' : '#98a8b8');
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, pw);
+  ctx.fillStyle = dk ? '#2a3a4a' : '#b8c0c8'; ctx.fillRect(x+2, y+(pw-iw)/2, w-4, iw);
+}
+
+function drawTruck(ctx) {
+    if(truck.st === 'idle') return;
+    const tx = truck.x, ty = truck.y;
+    
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(tx + 25, ty, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(tx + 90, ty, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ccc';
+    ctx.beginPath(); ctx.arc(tx + 25, ty, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(tx + 90, ty, 4, 0, Math.PI * 2); ctx.fill();
+    
+    ctx.fillStyle = dk ? '#cfd8dc' : '#eceff1';
+    rr(ctx, tx + 75, ty - 38, 35, 30, 4); ctx.fill();
+    ctx.fillStyle = '#81d4fa'; 
+    ctx.fillRect(tx + 88, ty - 33, 18, 14);
+    
+    const tg = ctx.createLinearGradient(0, ty - 45, 0, ty - 10);
+    tg.addColorStop(0, '#ff9800'); tg.addColorStop(1, '#e65100');
+    ctx.fillStyle = tg;
+    rr(ctx, tx, ty - 45, 82, 36, 12); ctx.fill();
+    
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(tx + 10, ty - 40, 60, 6);
+    
+    ctx.fillStyle = '#fff'; ctx.font = '900 14px Pretendard'; ctx.textAlign = 'center';
+    ctx.fillText('CRUDE', tx + 40, ty - 22);
+    
+    if(truck.st === 'pour') {
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx + 105, ty - 12); ctx.lineTo(FN.x - 55, ty - 12); ctx.stroke();
+    }
+}
+
+function drawFurnaceDynamic(ctx){
+  const x = FN.x, y = FN.y, w = FN.w, h = FN.h;
+  if(cT > 15){
+    const it = Math.min(1, cT / 350);
+    const g = ctx.createLinearGradient(0, y+h-12, 0, y+32);
+    g.addColorStop(0, `rgba(230,50,10,${it*.7})`); g.addColorStop(.25, `rgba(245,140,20,${it*.4})`);
+    g.addColorStop(.55, `rgba(255,200,30,${it*.15})`); g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g; rr(ctx, x+14, y+32, w-28, h-44, 8); ctx.fill();
+  }
+  let fI = cT <= 0 ? 0 : Math.min(1, cT / 370); if(done) fI = 0;
+  if(fI > 0){
+    const bY = y+h+20, mH = 65 * fI;
+    const gg = ctx.createRadialGradient(x+w/2, bY, 3, x+w/2, bY-5, 45+fI*30);
+    gg.addColorStop(0, `rgba(255,100,10,${fI*.35})`); gg.addColorStop(1, 'transparent');
+    ctx.fillStyle = gg; ctx.fillRect(x-12, bY-mH-10, w+24, mH+20);
+    
+    for(let i = 0; i < 11; i++){
+      const fx = x+10+(w-20)*(i/10), t = aT*3+i*1.8;
+      const fl = .45+Math.sin(t)*.25+Math.sin(t*2.3)*.15+Math.random()*.08;
+      const fh = mH*fl, fw = 7+Math.sin(t*1.2)*1.5;
+      const g1 = ctx.createLinearGradient(fx, bY, fx, bY-fh);
+      g1.addColorStop(0, `rgba(220,50,5,${.85*fI})`); g1.addColorStop(.3, `rgba(245,120,10,${.6*fI})`);
+      g1.addColorStop(.6, `rgba(255,180,20,${.3*fI})`); g1.addColorStop(1, 'transparent');
+      ctx.fillStyle = g1; ctx.beginPath(); ctx.moveTo(fx-fw, bY);
+      ctx.quadraticCurveTo(fx-fw*.5, bY-fh*.6, fx+Math.sin(t*2)*1.2, bY-fh);
+      ctx.quadraticCurveTo(fx+fw*.5, bY-fh*.6, fx+fw, bY); ctx.fill();
+      
+      if(fI > .35){
+        const ih = fh*.45, iw = fw*.4; const g2 = ctx.createLinearGradient(fx, bY, fx, bY-ih);
+        g2.addColorStop(0, `rgba(255,220,70,${.6*fI})`); g2.addColorStop(.5, `rgba(255,240,140,${.25*fI})`); g2.addColorStop(1, 'transparent');
+        ctx.fillStyle = g2; ctx.beginPath(); ctx.moveTo(fx-iw, bY); ctx.quadraticCurveTo(fx, bY-ih, fx+iw, bY); ctx.fill();
+      }
+    }
+  }
+}
+
+function drawTowerDynamic(ctx){
+  if(showTP){
+    const bx = TW.x - 22, bw = 8;
+    const bg = ctx.createLinearGradient(0, TW.y, 0, TW.y + TW.h);
+    bg.addColorStop(0, '#1870d0'); bg.addColorStop(.25, '#38a050'); bg.addColorStop(.6, '#d09010'); bg.addColorStop(1, '#c02005');
+    ctx.fillStyle = bg; rr(ctx, bx, TW.y, bw, TW.h, 4); ctx.fill();
+    
+    const bgC = dk ? 'rgba(20,30,45,0.85)' : 'rgba(255,255,255,0.85)';
+    drawTextBg(ctx, '▲ 낮은 온도', bx + bw/2, TW.y - 12, bgC, '#3aa0ff', "700 12px Pretendard");
+    drawTextBg(ctx, '▼ 높은 온도', bx + bw/2, TW.y + TW.h + 18, bgC, '#ff4020', "700 12px Pretendard");
+  }
+  if(showRF && cT > 100){
+    const s1 = Math.sin(aT * 3) * 5;
+    const bCol = dk ? 'rgba(10,15,25,0.85)' : 'rgba(255,255,255,0.9)';
+    
+    drawTextBg(ctx, '↑ 증기 상승', TW.x + 28, TW.y + TW.h*.3 + s1, bCol, '#ff6633', "bold 12px Pretendard", 8);
+    drawTextBg(ctx, '↓ 액체 하강', TW.x + TW.w - 28, TW.y + TW.h*.5 - s1, bCol, '#3388ff', "bold 12px Pretendard", 8);
+    drawTextBg(ctx, '환류: 응축액을 되돌려 기액 접촉 → 순도 향상', TW.x + TW.w/2, TW.y - 18, bCol, cv2('--tx'), "700 11px Pretendard", 10);
+    
+    F.forEach((f, i) => {
+      if(i >= F.length - 1) return; const ty = f.yb; const pulse = Math.sin(aT * 4 + i) * .5 + .5;
+      ctx.fillStyle = `rgba(255,200,50,${pulse * .15})`; ctx.beginPath(); ctx.arc(TW.x + TRAY_GAP + 30, ty, 10, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+}
+
+function drawUI(){
+  X.fillStyle = cv2('--acc'); X.font = "900 26px 'Black Han Sans', Pretendard"; X.textAlign = 'left'; X.fillText('원유의 분별 증류', 20, 36);
+  X.fillStyle = cv2('--tx3'); X.font = "600 13px Pretendard"; X.fillText('끓는점 차이를 이용한 혼합물의 분리', 20, 58);
+  
+  // 좌측 정렬된 버튼 렌더링
+  drawBtn(X, BT.inj, '#105080', '🛢️ 원유 주입');
+  drawBtn(X, BT.rst, done ? '#c02505' : '#885020', done ? '🔄 다시하기' : '↺ 초기화');
+  drawToggle(X, BT.tp, '🌡️ 온도분포 표시', showTP);
+  drawToggle(X, BT.rf, '🔄 환류 원리 표시', showRF);
+  drawBtn(X, BT.thm, dk ? '#354560' : '#8a95a5', dk ? '☀️ 라이트 모드' : '🌙 다크 모드', 13);
+  drawBtn(X, BT.ful, dk ? '#354560' : '#8a95a5', '⛶ 전체 화면', 13);
+  
+  const rT = BT.tup, rD = BT.tdn;
+  X.fillStyle = isTUp ? cv2('--acc2') : cv2('--acc'); rr(X, rT.x, rT.y, rT.w, rT.h, 8); X.fill();
+  X.fillStyle = '#fff'; X.font = "800 15px Pretendard"; X.textAlign = 'center'; X.fillText("▲ 온도 올리기", rT.x + rT.w/2, rT.y + 23);
+
+  X.fillStyle = isTDn ? cv2('--tx3') : (dk ? '#3a4a5a' : '#98a8b8'); rr(X, rD.x, rD.y, rD.w, rD.h, 8); X.fill();
+  X.fillStyle = '#fff'; X.font = "800 15px Pretendard"; X.fillText("▼ 온도 내리기", rD.x + rD.w/2, rD.y + 23);
+
+  // 온도 라벨 렌더링
+  const cr = cT / 450;
+  const tCol = cr > 0.6 ? '#e03010' : '#2070d0';
+  tInp.style.borderColor = tCol;
+  tInp.style.color = tCol;
+  
+  X.fillStyle = cv2('--tx2'); X.font = "600 12px Pretendard"; 
+  X.fillText('가열로 목표 온도 (타이핑 가능)', TBOX.x + TBOX.w/2, TBOX.y - 10);
+  
+  X.fillStyle = cv2('--tx3'); X.font = "700 12px Pretendard"; X.textAlign = 'right'; X.fillText('ⓒ 송쌤과학', W-20, H-24);
+  X.font = "500 10px 'IBM Plex Mono'"; X.fillText('가상실험실', W-20, H-10);
+  X.fillStyle = cv2('--tx3'); X.font = "600 12px Pretendard"; X.textAlign = 'center';
+  X.fillText('원유를 가열하여 기화시킵니다 → 증류탑을 올라가며 끓는점이 높은 순으로 액화 분리됩니다.', W/2, H-20);
+}
+
+function drawBtn(ctx, r, c, t, fSize = 14){
+  ctx.fillStyle = c; rr(ctx, r.x, r.y, r.w, r.h, 8); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = `800 ${fSize}px Pretendard`; ctx.textAlign = 'center'; ctx.fillText(t, r.x + r.w/2, r.y + r.h/2 + 5);
+}
+function drawToggle(ctx, r, t, on){
+  ctx.fillStyle = on ? 'rgba(25,130,70,.85)' : 'rgba(100,110,120,.35)'; rr(ctx, r.x, r.y, r.w, r.h, 6); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = "700 12px Pretendard"; ctx.textAlign = 'center'; ctx.fillText(t, r.x + r.w/2, r.y + r.h/2 + 4);
+}
+
+function render(){
+  if(!bgCached){ drawStaticCache(); bgCached = true; }
+  X.clearRect(0, 0, W, H); X.drawImage(bgCanvas, 0, 0);
+  
+  drawFurnaceDynamic(X);
+  drawTruck(X);
+  pts.forEach(p => p.draw(X));
+  if(showRF){ rfxUp.forEach(r => r.draw(X)); rfxDn.forEach(r => r.draw(X)); }
+  drawTowerDynamic(X);
+  drawUI(); drawDragItem();
+}
+
+function drawDragItem(){
+  let fr = null, cx = 0, cy = 0;
+  if(isDrF && dFr){ fr = dFr; cx = mx; cy = my; } else if(aLbl){ fr = aLbl.f; cx = aLbl.x; cy = aLbl.y; } else return;
+  const ins = cx >= TW.x - 12 && cx <= TW.x + TW.w + 12 && cy >= TW.y && cy <= TW.y + TW.h;
+  let st = '', sc = '', isG = false;
+  if(ins){
+    const pr = Math.max(0, (cy - TW.y) / TW.h); const tA = Math.round(420 * pr + 20 * (1 - pr)); const ab = (fr.bp0 + fr.bp1) / 2;
+    if(fr.s === '잔류물'){ st = '미기화 잔류물'; sc = '#604028'; isG = false; }
+    else if(fr.s === '석유 가스'){ st = '기체 상태'; sc = '#e04020'; isG = true; }
+    else if(tA > ab){ st = `기체 상태 (${tA}℃ > 끓는점)`; sc = '#e04020'; isG = true; }
+    else{ st = `액체 상태 (${tA}℃ < 끓는점)`; sc = '#2070d0'; isG = false; }
+    const t = Date.now();
+    
+    // 이모지를 활용한 직관적인 기체/액체 애니메이션 렌더링
+    X.save();
+    X.font = "800 13px Pretendard";
+    const tw = X.measureText(st).width + 30;
+    
+    // 테두리 및 텍스트 배경 박스 (그림자 버그 제거됨)
+    X.shadowColor = 'rgba(0,0,0,0.3)'; X.shadowBlur = 10;
+    X.fillStyle = isG ? '#fff5f0' : '#f0f8ff';
+    rr(X, cx - tw/2, cy - 55, tw, 28, 8); X.fill();
+    X.shadowColor = 'transparent';
+    X.strokeStyle = sc; X.lineWidth = 2;
+    rr(X, cx - tw/2, cy - 55, tw, 28, 8); X.stroke();
+    
+    X.fillStyle = sc; X.textAlign = 'center'; X.textBaseline = 'middle';
+    X.fillText(st, cx, cy - 41);
+    X.textBaseline = 'alphabetic';
+    
+    // 귀여운 이모지 애니메이션 표시
+    if (isG) {
+        const yOff = (t / 50) % 15;
+        X.font = "20px Arial";
+        X.fillText("☁️", cx - 25, cy - 65 - yOff);
+        X.fillText("🫧", cx + 15, cy - 75 - (t/40)%20);
+    } else {
+        const yOff = (t / 40) % 15;
+        X.font = "16px Arial";
+        X.fillText("💧", cx - 15, cy + 25 + yOff);
+        X.fillText("💧", cx + 15, cy + 35 + (t/30)%15);
+    }
+    
+    // 온도 툴팁
+    drawTextBg(X, `탑 내부: ~${tA}℃`, cx, cy+45, 'rgba(20,25,35,0.9)', '#ffcc33', "700 12px 'IBM Plex Mono'");
+    X.restore();
+  }
+  
+  // 이름표 그리기
+  X.shadowColor = 'rgba(0,0,0,.3)'; X.shadowBlur = 10; X.shadowOffsetX = 0; X.shadowOffsetY = 5;
+  X.fillStyle = fr.col; rr(X, cx-40, cy-15, 80, 30, 8); X.fill(); X.shadowColor = 'transparent';
+  X.fillStyle = 'rgba(255,255,255,.1)'; X.fillRect(cx-39, cy-14, 78, 14);
+  X.strokeStyle = 'rgba(255,255,255,.15)'; X.lineWidth = 1; rr(X, cx-40, cy-15, 80, 30, 8); X.stroke();
+  X.fillStyle = '#fff'; X.font = "800 14px Pretendard"; X.textAlign = 'center'; X.fillText(fr.s, cx, cy+5);
+}
+
+let mcb = null;
+function showD(m, cb = null){
+  document.getElementById('mg').innerText = m;
+  const ov = document.getElementById('ov');
+  ov.style.display = 'flex';
+  setTimeout(() => ov.classList.add('show'), 10);
+  mcb = cb;
+}
+window.clD = function(){
+  const ov = document.getElementById('ov');
+  ov.classList.remove('show');
+  setTimeout(() => { ov.style.display = 'none'; if(mcb){ mcb(); mcb = null; } }, 300);
+}
+function tFS(){ const e = document.documentElement; if(!document.fullscreenElement)(e.requestFullscreen||e.webkitRequestFullscreen||e.msRequestFullscreen).call(e); else(document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen).call(document); }
+window.onload = init;
+</script>
+</body>
+</html>
