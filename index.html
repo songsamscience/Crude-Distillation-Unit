@@ -34,8 +34,8 @@ canvas { display: block; width: 100%; height: 100%; }
 /* 온도 입력창 스타일 */
 #tempInp {
     position: absolute;
-    /* 캔버스 기준 비율로 위치 지정 (x:380, y:575, w:140, h:40) */
-    left: 34.545%; top: 87.121%; width: 12.727%; height: 6.060%;
+    /* 캔버스 기준 비율로 위치 지정 (x:20, y:250, w:140, h:40) */
+    left: 1.818%; top: 37.878%; width: 12.727%; height: 6.060%;
     background: var(--card);
     border: 2.5px solid #2070d0;
     border-radius: 8px;
@@ -53,6 +53,27 @@ canvas { display: block; width: 100%; height: 100%; }
     -webkit-appearance: none; margin: 0;
 }
 #tempInp:focus { box-shadow: 0 0 10px rgba(32, 112, 208, 0.5); }
+
+/* 참고 소스 출처 링크 스타일 */
+#refLink {
+    position: absolute;
+    left: 20px;
+    bottom: 15px;
+    font-size: 13px;
+    color: var(--tx3);
+    z-index: 10;
+    font-weight: 600;
+    pointer-events: auto;
+}
+#refLink a {
+    color: var(--acc);
+    text-decoration: none;
+    transition: color 0.2s, text-decoration 0.2s;
+}
+#refLink a:hover {
+    color: var(--acc2);
+    text-decoration: underline;
+}
 
 /* 모달 스타일 */
 .ov {
@@ -82,6 +103,10 @@ canvas { display: block; width: 100%; height: 100%; }
     <canvas id="cv" width="1100" height="660"></canvas>
     <!-- 직접 타이핑 가능한 온도 입력창 -->
     <input type="number" id="tempInp" min="0" max="450" value="0">
+    <!-- 참고 소스 출처 링크 -->
+    <div id="refLink">
+        참고 소스 출처: <a href="https://sciencelove.com/483129" target="_blank">[김정식 허명성의 과학사랑]</a>
+    </div>
     <div id="ov" class="ov">
         <div class="dg">
             <h2>🧪 원유의 분별 증류 가상실험</h2>
@@ -96,22 +121,22 @@ const tInp = document.getElementById('tempInp');
 let dk = true, aT = 0;
 
 /* ═══ 레이아웃 및 구역 설정 (겹침 방지 및 중앙 정렬 최적화) ═══ */
-const FN = {x: 130, y: 330, w: 225, h: 225}; // 가열로 (좌측으로 이동)
-const TW = {x: 550, y: 48, w: 210, h: 505};  // 증류탑 (우측으로 이동)
+const FN = {x: 130, y: 340, w: 225, h: 225}; // 가열로 위치 조정
+const TW = {x: 550, y: 48, w: 210, h: 505};  // 증류탑
 const TRAY_GAP = 48; // 증류탑 내 이동 통로 너비
 
-/* ═══ UI 버튼 영역 (가열로와 증류탑 사이 중앙 배열) ═══ */
+/* ═══ UI 버튼 영역 (제목과 가열로 사이의 좌측 상단 공간) ═══ */
 const BT = {
-    inj: {x: 380, y: 300, w: 140, h: 48}, // 원유 주입
-    rst: {x: 380, y: 360, w: 140, h: 36}, // 초기화
-    tp:  {x: 380, y: 410, w: 140, h: 32}, // 온도분포 토글
-    rf:  {x: 380, y: 455, w: 140, h: 32}, // 환류표시 토글
-    tup: {x: 380, y: 535, w: 140, h: 35}, // 온도 상승 (파이프 아래 위치)
-    tdn: {x: 380, y: 620, w: 140, h: 35}, // 온도 하강
+    inj: {x: 20, y: 90, w: 140, h: 42},  // 원유 주입
+    rst: {x: 170, y: 90, w: 140, h: 42}, // 초기화
+    tp:  {x: 20, y: 140, w: 140, h: 36}, // 온도분포 토글
+    rf:  {x: 170, y: 140, w: 140, h: 36}, // 환류표시 토글
+    tup: {x: 20, y: 210, w: 140, h: 36}, // 온도 상승 (간격 및 위치 조정)
+    tdn: {x: 20, y: 295, w: 140, h: 36}, // 온도 하강 (간격 및 위치 조정)
     thm: {x: 970, y: 15, w: 110, h: 35}, // 다크/라이트 모드
     ful: {x: 970, y: 58, w: 110, h: 35}  // 전체화면
 };
-const TBOX = {x: 380, y: 575, w: 140, h: 40}; // 라벨 표시를 위한 위치 참조
+const TBOX = {x: 20, y: 250, w: 140, h: 40}; // 라벨 표시를 위한 위치 참조
 
 /* ═══ 8개 층 분리 정보 ═══ */
 const F = [
@@ -148,7 +173,9 @@ function nr(m,s){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();r
 function drawTextBg(ctx, txt, x, y, bgCol, txtCol, font, pad = 6) {
     ctx.font = font;
     const w = ctx.measureText(txt).width;
-    const h = parseInt(font, 10);
+    // 폰트 문자열에서 크기(px)만 정확히 추출하도록 수정하여 검은색 바(거대 배경) 현상 해결
+    const match = font.match(/(\d+)px/);
+    const h = match ? parseInt(match[1], 10) : 14;
     ctx.fillStyle = bgCol;
     rr(ctx, x - w/2 - pad, y - h + pad/2, w + pad*2, h + pad, 6);
     ctx.fill();
@@ -249,7 +276,8 @@ function reset(){ cT = 0; tT = 0; done = false; ejN = 0; pts = []; rfxUp = []; r
 function callTruck(){ 
     if(truck.st === 'idle' || truck.st === 'out') { 
         truck.st = 'in'; truck.x = -200; truck.tk = 0; truck.cnt = 0; 
-        ejN = 0; done = false; pts = []; 
+        ejN = 0; done = false;
+        // pts = []; 삭제: 기존 입자를 유지하여 누적시킴
     } 
 }
 function updateTruck() {
@@ -264,6 +292,8 @@ function updateTruck() {
             pts.push(new Pt(FN.x - 45, truck.y - 10, 'inj'));
             pts.push(new Pt(FN.x - 45, truck.y - 14, 'inj'));
             truck.cnt += 3;
+            // 입자가 너무 많아지면 가장 오래된 것을 제거 (성능 유지)
+            while(pts.length > 1200) pts.shift();
         }
         if(truck.tk > 160) { truck.st = 'out'; }
     } else if(truck.st === 'out') {
@@ -516,14 +546,34 @@ function drawFurnaceDynamic(ctx){
 
 function drawTowerDynamic(ctx){
   if(showTP){
-    const bx = TW.x - 22, bw = 8;
+    // 상압증류탑 텍스트(온도)와 겹치지 않게 왼쪽으로 띄움 및 가독성 대폭 개선(뱃지 스타일 적용)
+    const bx = TW.x - 75, bw = 14;
     const bg = ctx.createLinearGradient(0, TW.y, 0, TW.y + TW.h);
-    bg.addColorStop(0, '#1870d0'); bg.addColorStop(.25, '#38a050'); bg.addColorStop(.6, '#d09010'); bg.addColorStop(1, '#c02005');
-    ctx.fillStyle = bg; rr(ctx, bx, TW.y, bw, TW.h, 4); ctx.fill();
+    bg.addColorStop(0, '#3aa0ff'); bg.addColorStop(.25, '#38a050'); bg.addColorStop(.6, '#d09010'); bg.addColorStop(1, '#ff4020');
+    ctx.fillStyle = bg; rr(ctx, bx, TW.y, bw, TW.h, 7); ctx.fill();
+    ctx.strokeStyle = dk ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1.5; rr(ctx, bx, TW.y, bw, TW.h, 7); ctx.stroke();
     
-    const bgC = dk ? 'rgba(20,30,45,0.85)' : 'rgba(255,255,255,0.85)';
-    drawTextBg(ctx, '▲ 낮은 온도', bx + bw/2, TW.y - 12, bgC, '#3aa0ff', "700 12px Pretendard");
-    drawTextBg(ctx, '▼ 높은 온도', bx + bw/2, TW.y + TW.h + 18, bgC, '#ff4020', "700 12px Pretendard");
+    // 낮은 온도 뱃지
+    ctx.font = "800 14px Pretendard";
+    const topTxt = "❄️ 낮은 온도";
+    const topW = ctx.measureText(topTxt).width + 24;
+    ctx.fillStyle = dk ? 'rgba(26,43,69,0.95)' : 'rgba(234,244,255,0.95)';
+    rr(ctx, bx + bw/2 - topW/2, TW.y - 38, topW, 30, 15); ctx.fill();
+    ctx.strokeStyle = '#3aa0ff'; ctx.lineWidth = 2;
+    rr(ctx, bx + bw/2 - topW/2, TW.y - 38, topW, 30, 15); ctx.stroke();
+    ctx.fillStyle = dk ? '#77bdff' : '#0055b3';
+    ctx.textAlign = 'center'; ctx.fillText(topTxt, bx + bw/2, TW.y - 18);
+    
+    // 높은 온도 뱃지
+    const botTxt = "🔥 높은 온도";
+    const botW = ctx.measureText(botTxt).width + 24;
+    ctx.fillStyle = dk ? 'rgba(69,26,26,0.95)' : 'rgba(255,234,234,0.95)';
+    rr(ctx, bx + bw/2 - botW/2, TW.y + TW.h + 8, botW, 30, 15); ctx.fill();
+    ctx.strokeStyle = '#ff4020'; ctx.lineWidth = 2;
+    rr(ctx, bx + bw/2 - botW/2, TW.y + TW.h + 8, botW, 30, 15); ctx.stroke();
+    ctx.fillStyle = dk ? '#ff7766' : '#cc1100';
+    ctx.fillText(botTxt, bx + bw/2, TW.y + TW.h + 28);
   }
   if(showRF && cT > 100){
     const s1 = Math.sin(aT * 3) * 5;
@@ -565,8 +615,9 @@ function drawUI(){
   tInp.style.borderColor = tCol;
   tInp.style.color = tCol;
   
-  X.fillStyle = cv2('--tx2'); X.font = "600 12px Pretendard"; 
-  X.fillText('가열로 목표 온도 (타이핑 가능)', TBOX.x + TBOX.w/2, TBOX.y - 10);
+  X.fillStyle = cv2('--tx2'); X.font = "700 13px Pretendard"; 
+  // 가열로 목표 온도 글씨를 온도 컨트롤러 셋 상단(온도 올리기 위)으로 이동
+  X.fillText('가열로 목표 온도', rT.x + rT.w/2, rT.y - 12);
   
   X.fillStyle = cv2('--tx3'); X.font = "700 12px Pretendard"; X.textAlign = 'right'; X.fillText('ⓒ 송쌤과학', W-20, H-24);
   X.font = "500 10px 'IBM Plex Mono'"; X.fillText('가상실험실', W-20, H-10);
@@ -608,44 +659,75 @@ function drawDragItem(){
     else{ st = `액체 상태 (${tA}℃ < 끓는점)`; sc = '#2070d0'; isG = false; }
     const t = Date.now();
     
-    // 이모지를 활용한 직관적인 기체/액체 애니메이션 렌더링
     X.save();
+    
+    // 하나의 통합된 박스에 온도와 상태를 모두 표시 (마우스 겹침 방지)
     X.font = "800 13px Pretendard";
-    const tw = X.measureText(st).width + 30;
+    const tw1 = X.measureText(st).width + 30;
+    X.font = "700 12px 'IBM Plex Mono'";
+    const tw2 = X.measureText(`🌡️ 탑 내부: ~${tA}℃`).width + 30;
+    const boxW = Math.max(tw1, tw2, 160);
+    const boxH = 50;
+    const boxX = cx - boxW / 2;
+    // 마우스 커서 위쪽으로 충분히 띄움 (물방울이 들어갈 공간 확보)
+    const boxY = cy - 95; 
+
+    // 테두리 및 텍스트 배경 박스 (그림자 추가)
+    X.shadowColor = 'rgba(0,0,0,0.3)'; X.shadowBlur = 10; X.shadowOffsetY = 4;
+    X.fillStyle = dk ? 'rgba(20, 26, 36, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+    rr(X, boxX, boxY, boxW, boxH, 8); X.fill();
+    X.shadowBlur = 0; X.shadowOffsetY = 0; X.shadowColor = 'transparent';
     
-    // 테두리 및 텍스트 배경 박스 (그림자 버그 제거됨)
-    X.shadowColor = 'rgba(0,0,0,0.3)'; X.shadowBlur = 10;
-    X.fillStyle = isG ? '#fff5f0' : '#f0f8ff';
-    rr(X, cx - tw/2, cy - 55, tw, 28, 8); X.fill();
-    X.shadowColor = 'transparent';
+    // 상단 타이틀 영역 살짝 배경색 다르게 처리 (기체/액체에 따라 톤 차이)
+    X.save();
+    rr(X, boxX, boxY, boxW, boxH, 8); X.clip();
+    X.fillStyle = isG ? 'rgba(224, 64, 32, 0.08)' : 'rgba(32, 112, 208, 0.08)';
+    X.fillRect(boxX, boxY, boxW, 25);
+    // 구분선
+    X.strokeStyle = dk ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    X.lineWidth = 1;
+    X.beginPath(); X.moveTo(boxX, boxY + 25); X.lineTo(boxX + boxW, boxY + 25); X.stroke();
+    X.restore();
+
+    // 테두리
     X.strokeStyle = sc; X.lineWidth = 2;
-    rr(X, cx - tw/2, cy - 55, tw, 28, 8); X.stroke();
+    rr(X, boxX, boxY, boxW, boxH, 8); X.stroke();
     
-    X.fillStyle = sc; X.textAlign = 'center'; X.textBaseline = 'middle';
-    X.fillText(st, cx, cy - 41);
+    X.textAlign = 'center'; X.textBaseline = 'middle';
+    
+    // 상단 온도 텍스트
+    X.font = "700 12px 'IBM Plex Mono'";
+    X.fillStyle = dk ? '#ffcc33' : '#d09010';
+    X.fillText(`🌡️ 탑 내부: ~${tA}℃`, cx, boxY + 13);
+
+    // 하단 상태 텍스트
+    X.font = "800 13px Pretendard";
+    X.fillStyle = sc;
+    X.fillText(st, cx, boxY + 38);
+    
     X.textBaseline = 'alphabetic';
     
     // 귀여운 이모지 애니메이션 표시
     if (isG) {
         const yOff = (t / 50) % 15;
         X.font = "20px Arial";
-        X.fillText("☁️", cx - 25, cy - 65 - yOff);
-        X.fillText("🫧", cx + 15, cy - 75 - (t/40)%20);
+        X.fillText("☁️", cx - 35, boxY - 10 - yOff);
+        X.fillText("🫧", cx + 25, boxY - 20 - (t/40)%20);
     } else {
         const yOff = (t / 40) % 15;
         X.font = "16px Arial";
-        X.fillText("💧", cx - 15, cy + 25 + yOff);
-        X.fillText("💧", cx + 15, cy + 35 + (t/30)%15);
+        // 물방울이 이름표 버튼(cy - 15) 위쪽에서만 떨어지도록 시작 좌표 최적화
+        X.fillText("💧", cx - 25, boxY + boxH + 8 + yOff);
+        X.fillText("💧", cx + 25, boxY + boxH + 13 + (t/30)%15);
     }
     
-    // 온도 툴팁
-    drawTextBg(X, `탑 내부: ~${tA}℃`, cx, cy+45, 'rgba(20,25,35,0.9)', '#ffcc33', "700 12px 'IBM Plex Mono'");
     X.restore();
   }
   
   // 이름표 그리기
   X.shadowColor = 'rgba(0,0,0,.3)'; X.shadowBlur = 10; X.shadowOffsetX = 0; X.shadowOffsetY = 5;
-  X.fillStyle = fr.col; rr(X, cx-40, cy-15, 80, 30, 8); X.fill(); X.shadowColor = 'transparent';
+  X.fillStyle = fr.col; rr(X, cx-40, cy-15, 80, 30, 8); X.fill(); 
+  X.shadowBlur = 0; X.shadowOffsetX = 0; X.shadowOffsetY = 0; X.shadowColor = 'transparent';
   X.fillStyle = 'rgba(255,255,255,.1)'; X.fillRect(cx-39, cy-14, 78, 14);
   X.strokeStyle = 'rgba(255,255,255,.15)'; X.lineWidth = 1; rr(X, cx-40, cy-15, 80, 30, 8); X.stroke();
   X.fillStyle = '#fff'; X.font = "800 14px Pretendard"; X.textAlign = 'center'; X.fillText(fr.s, cx, cy+5);
