@@ -27,8 +27,21 @@ body.light {
     aspect-ratio: 1100 / 660; background: transparent; overflow: hidden;
     box-shadow: 0 15px 60px var(--shd); border-radius: 12px;
 }
+/* 일반 상태: 비율 유지 */
 @media (max-aspect-ratio: 1100/660) { #app { height: auto; } }
 @media (min-aspect-ratio: 1100/660) { #app { width: auto; } }
+
+/* 전체화면 상태: 화면에 꽉 차게 - 비율 제약 해제 */
+:fullscreen #app, :-webkit-full-screen #app {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    aspect-ratio: auto !important;
+    border-radius: 0;
+    box-shadow: none;
+}
+
 canvas { display: block; width: 100%; height: 100%; }
 
 /* 온도 입력창 스타일 */
@@ -41,7 +54,7 @@ canvas { display: block; width: 100%; height: 100%; }
     border-radius: 8px;
     color: #2070d0;
     text-align: center;
-    font-size: 24px;
+    font-size: clamp(18px, 2.2vw, 26px);
     font-family: 'IBM Plex Mono', monospace;
     font-weight: 700;
     outline: none;
@@ -54,25 +67,43 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 #tempInp:focus { box-shadow: 0 0 10px rgba(32, 112, 208, 0.5); }
 
-/* 참고 소스 출처 링크 스타일 */
-#refLink {
+/* 참고 소스 출처 & 유튜브 링크 스타일 */
+#linkBar {
     position: absolute;
     left: 20px;
-    bottom: 15px;
-    font-size: 13px;
+    bottom: 12px;
+    font-size: clamp(10px, 1.1vw, 13px);
     color: var(--tx3);
     z-index: 10;
     font-weight: 600;
     pointer-events: auto;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
 }
-#refLink a {
+#linkBar .lnk {
     color: var(--acc);
     text-decoration: none;
     transition: color 0.2s, text-decoration 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
-#refLink a:hover {
+#linkBar .lnk:hover {
     color: var(--acc2);
     text-decoration: underline;
+}
+#linkBar .yt {
+    color: #ff4646;
+    font-weight: 800;
+}
+#linkBar .yt:hover {
+    color: #ff0000;
+}
+#linkBar .sep {
+    color: var(--tx3);
+    opacity: 0.4;
 }
 
 /* 모달 스타일 */
@@ -83,13 +114,14 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .ov.show { opacity: 1; pointer-events: auto; }
 .dg {
-    background: var(--card); border: 1px solid var(--bdr); padding: 40px; border-radius: 24px; 
-    text-align: center; max-width: 500px; min-width: 320px; box-shadow: 0 25px 80px var(--shd);
+    background: var(--card); border: 1px solid var(--bdr); padding: clamp(24px, 3vw, 40px); border-radius: 24px; 
+    text-align: center; max-width: 500px; min-width: 300px; box-shadow: 0 25px 80px var(--shd);
     transform: translateY(20px); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    max-height: 85vh; overflow-y: auto;
 }
 .ov.show .dg { transform: translateY(0); }
-.dg h2 { font-size: 24px; font-weight: 800; margin-bottom: 20px; color: var(--acc); }
-.dg p { white-space: pre-line; line-height: 1.7; color: var(--tx); font-size: 15px; font-weight: 500; margin-bottom: 28px; text-align: left; }
+.dg h2 { font-size: clamp(18px, 2.5vw, 24px); font-weight: 800; margin-bottom: 20px; color: var(--acc); }
+.dg p { white-space: pre-line; line-height: 1.7; color: var(--tx); font-size: clamp(13px, 1.4vw, 15px); font-weight: 500; margin-bottom: 28px; text-align: left; }
 .dg button {
     padding: 14px 45px; background: var(--acc); color: #fff; border: none; border-radius: 12px; 
     font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.2s;
@@ -103,9 +135,11 @@ canvas { display: block; width: 100%; height: 100%; }
     <canvas id="cv" width="1100" height="660"></canvas>
     <!-- 직접 타이핑 가능한 온도 입력창 -->
     <input type="number" id="tempInp" min="0" max="450" value="0">
-    <!-- 참고 소스 출처 링크 -->
-    <div id="refLink">
-        참고 소스 출처: <a href="https://sciencelove.com/483129" target="_blank">[김정식 허명성의 과학사랑]</a>
+    <!-- 참고 소스 출처 & 유튜브 링크 -->
+    <div id="linkBar">
+        <span>📚 참고: <a class="lnk" href="https://sciencelove.com/483129" target="_blank">김정식 허명성의 과학사랑</a></span>
+        <span class="sep">|</span>
+        <a class="lnk yt" href="https://www.youtube.com/@songsamscience" target="_blank">▶ 송쌤과학 YouTube</a>
     </div>
     <div id="ov" class="ov">
         <div class="dg">
@@ -138,15 +172,15 @@ const BT = {
 };
 const TBOX = {x: 20, y: 250, w: 140, h: 40}; // 라벨 표시를 위한 위치 참조
 
-/* ═══ 8개 층 분리 정보 ═══ */
+/* ═══ 8개 층 분리 정보 (석유가스 온도 범위 표시용 tr 추가) ═══ */
 const F = [
-  {nm:'석유 가스', s:'석유 가스', bp0:-42, bp1:20, col:'#dcb020', C:'C₁~C₄', tr:'20℃', nfo:'끓는점 ~20℃', use:'가정·식당 LPG 연료\nLPG 자동차 연료', mol:'분자 매우 작음\n상온에서 기체 상태'},
+  {nm:'석유 가스', s:'석유 가스', bp0:-42, bp1:20, col:'#dcb020', C:'C₁~C₄', tr:'~20℃', nfo:'끓는점 ~20℃', use:'가정·식당 LPG 연료\nLPG 자동차 연료', mol:'분자 매우 작음\n상온에서 기체 상태'},
   {nm:'휘발유', s:'휘발유', bp0:30, bp1:120, col:'#e04840', C:'C₅~C₉', tr:'30℃', nfo:'끓는점 30~120℃', use:'승용차 가솔린 연료\n경비행기 연료', mol:'탄소 5~9개\n휘발성 높음'},
   {nm:'나프타', s:'나프타', bp0:70, bp1:180, col:'#d07828', C:'C₅~C₁₂', tr:'110℃', nfo:'끓는점 70~180℃', use:'석유화학 원료\n플라스틱·합성섬유', mol:'탄소 5~12개\n화학공업 원료'},
   {nm:'등유', s:'등유', bp0:170, bp1:250, col:'#6050c0', C:'C₁₂~C₁₆', tr:'180℃', nfo:'끓는점 170~250℃', use:'제트기 연료\n보일러 난방', mol:'탄소 12~16개\n안정적 연소'},
   {nm:'경유', s:'경유', bp0:250, bp1:340, col:'#2070d0', C:'C₁₅~C₂₀', tr:'260℃', nfo:'끓는점 250~340℃', use:'디젤차·트럭·버스\n중장비 연료', mol:'탄소 15~20개\n점성 증가'},
-  {nm:'윤활유', s:'윤활유', bp0:300, bp1:380, col:'#18a068', C:'C₂₀~C₃₀', tr:'280℃', nfo:'끓는점 300~380℃', use:'기계·엔진 윤활유\n그리스 원료', mol:'탄소 20~30개\n높은 점성'},
-  {nm:'중유', s:'중유', bp0:340, bp1:420, col:'#c02010', C:'C₃₀~C₄₀', tr:'340℃', nfo:'끓는점 340~420℃', use:'대형 선박 연료\n발전소 보일러', mol:'탄소 30~40개\n매우 무거움'},
+  {nm:'윤활유', s:'윤활유', bp0:300, bp1:380, col:'#18a068', C:'C₂₀~C₃₀', tr:'340℃', nfo:'끓는점 300~380℃', use:'기계·엔진 윤활유\n그리스 원료', mol:'탄소 20~30개\n높은 점성'},
+  {nm:'중유', s:'중유', bp0:340, bp1:420, col:'#c02010', C:'C₃₀~C₄₀', tr:'380℃', nfo:'끓는점 340~420℃', use:'대형 선박 연료\n발전소 보일러', mol:'탄소 30~40개\n매우 무거움'},
   {nm:'잔류물', s:'잔류물', bp0:450, bp1:900, col:'#604028', C:'C₄₀↑', tr:'', nfo:'미기화 잔류물', use:'아스팔트 포장재\n방수재·코팅재', mol:'탄소 40개 이상\n450℃에서도 기화 안됨'}
 ];
 const LH = TW.h / F.length;
@@ -159,6 +193,7 @@ let pts = [], rfxUp = [], rfxDn = [];
 let showTP = true, showRF = false;
 let pDr = null, dFr = null, isDrF = false, dsx = 0, dsy = 0, mx = 0, my = 0, aLbl = null;
 let truck = { x: -200, y: 540, st: 'idle', tk: 0, cnt: 0 }; 
+let heatStarted = false; // 가열 시작 여부 (온도가 한번이라도 올라갔는지)
 
 /* ═══ 캐싱 및 유틸리티 ═══ */
 const bgCanvas = document.createElement('canvas'); bgCanvas.width = W; bgCanvas.height = H;
@@ -190,6 +225,7 @@ class Pt {
   constructor(sx, sy, st='inj'){
     const i = Math.floor(Math.random() * F.length);
     this.f = F[i];
+    this.idx = i; // 분자 종류 인덱스 저장
     const m = (this.f.bp0 + this.f.bp1) / 2, s = (this.f.bp1 - this.f.bp0) / 6;
     this.bp = nr(m, s); this.st = st; this.tk = 0;
     
@@ -215,7 +251,9 @@ class Pt {
       if(this.y < by){ this.y = by; this.vy = Math.abs(this.vy); }
       if(this.y > by + bh){ this.y = by + bh; this.vy = -Math.abs(this.vy); }
       
-      if(cT >= this.bp || (this.f.nm === '잔류물' && cT >= 350)){
+      /* ═══ 핵심 수정: 가열이 시작되어야만 기화하여 증류탑으로 이동 ═══ */
+      /* 석유가스는 상온에서 기체지만, 사용자가 온도를 조작하기 전에는 원유 상태로 유지 */
+      if(heatStarted && (cT >= this.bp || (this.f.nm === '잔류물' && cT >= 350))){
         if(this.x > bx + bw - 40 && this.y > by + bh - 50){ this.st = 'ph'; this.tk = 0; }
       }
       break;
@@ -272,7 +310,11 @@ class RfxFall {
   draw(ctx){ const a = (this.l / this.ml) * .4; ctx.fillStyle = `rgba(40,100,210,${a})`; ctx.beginPath(); ctx.arc(this.x, this.y, 1.6, 0, Math.PI * 2); ctx.fill(); }
 }
 
-function reset(){ cT = 0; tT = 0; done = false; ejN = 0; pts = []; rfxUp = []; rfxDn = []; aLbl = null; truck.st = 'idle'; truck.x = -200; tInp.value = 0; }
+function reset(){ 
+    cT = 0; tT = 0; done = false; ejN = 0; pts = []; rfxUp = []; rfxDn = []; aLbl = null; 
+    truck.st = 'idle'; truck.x = -200; tInp.value = 0;
+    heatStarted = false; // 가열 시작 플래그도 초기화
+}
 function callTruck(){ 
     if(truck.st === 'idle' || truck.st === 'out') { 
         truck.st = 'in'; truck.x = -200; truck.tk = 0; truck.cnt = 0; 
@@ -304,7 +346,7 @@ function updateTruck() {
 
 function intro(){ showD(
   "1. '🛢️ 원유 주입'으로 유조차를 불러 원유를 넣으세요.\n\n"+
-  "2. 온도를 직접 타이핑하거나 [▲/▼] 버튼을 눌러 조절하세요.\n\n"+
+  "2. 온도를 직접 타이핑하거나 [▲/▼] 버튼을 눌러 조절하세요.\n   ※ 온도를 올려야 원유가 기화되어 증류탑으로 올라갑니다!\n\n"+
   "3. 끓는점에 도달한 성분이 기화되어 파이프를 통해 증류탑 위로 분리됩니다.\n\n"+
   "4. 무거운 성분(잔류물)은 기화되지 않고 아래쪽으로 분리됩니다.\n\n"+
   "5. 이름표를 드래그하여 각 층의 물리적 상태(기체/액체)를 관찰하세요.\n\n"+
@@ -315,6 +357,11 @@ function intro(){ showD(
 /* ═══ 이벤트 핸들링 ═══ */
 function init(){
     reset(); window.addEventListener('resize', () => bgCached = false);
+    
+    // 전체화면 변경 감지 (캔버스 리사이즈)
+    document.addEventListener('fullscreenchange', () => { bgCached = false; });
+    document.addEventListener('webkitfullscreenchange', () => { bgCached = false; });
+    
     cv.addEventListener('mousedown', oD); cv.addEventListener('mousemove', oM); window.addEventListener('mouseup', oU);
     cv.addEventListener('touchstart', oD, {passive:false}); cv.addEventListener('touchmove', oM, {passive:false}); window.addEventListener('touchend', oU);
     
@@ -324,6 +371,8 @@ function init(){
         if(val > 450) val = 450;
         if(val < 0) val = 0;
         tT = val;
+        // 타이핑으로 온도를 올려도 가열 시작으로 간주
+        if(tT > 0) heatStarted = true;
     });
 
     loop(); intro();
@@ -335,7 +384,8 @@ function oD(e){
   if(hit(p, BT.ful)){ tFS(); return; } if(hit(p, BT.rst)){ reset(); intro(); return; }
   if(hit(p, BT.inj)){ callTruck(); return; } 
   if(hit(p, BT.tp)){ showTP = !showTP; return; } if(hit(p, BT.rf)){ showRF = !showRF; return; }
-  if(hit(p, BT.tup)){ isTUp = true; return; } if(hit(p, BT.tdn)){ isTDn = true; return; }
+  if(hit(p, BT.tup)){ isTUp = true; heatStarted = true; return; } 
+  if(hit(p, BT.tdn)){ isTDn = true; return; }
   
   for(let f of F){ if(p.x >= f.bx && p.x <= f.bx + 88 && p.y >= f.by && p.y <= f.by + 30){ pDr = f; dsx = p.x; dsy = p.y; return; } }
 }
@@ -354,10 +404,11 @@ function oU(){
 function loop(){
   aT += .016;
   
-  if(isTUp) tT = Math.min(450, tT + 2.5);
+  if(isTUp) { tT = Math.min(450, tT + 2.5); heatStarted = true; }
   if(isTDn) tT = Math.max(0, tT - 2.5);
   
-  if(cT < tT) cT = Math.min(cT + 2, tT); else if(cT > tT) cT = Math.max(cT - 2, tT);
+  if(cT < tT) { cT = Math.min(cT + 2, tT); if(cT > 0) heatStarted = true; } 
+  else if(cT > tT) cT = Math.max(cT - 2, tT);
   
   // 입력창과 내부 온도 상태 동기화 (사용자가 타이핑 중이 아닐 때만)
   if(document.activeElement !== tInp) {
@@ -443,6 +494,14 @@ function drawStaticCache(){
       if(f.tr){ bgX.fillStyle = cv2('--tx2'); bgX.font = "700 10px 'IBM Plex Mono'"; bgX.textAlign = 'right'; bgX.fillText(f.tr, TW.x-6, by+4); }
     }
   });
+  
+  /* ═══ 석유가스 온도 범위 표시 (최상단 층) ═══ */
+  /* 석유가스는 탑 최상단으로 기화되어 배출되므로 그 위치에 ~20℃ 표시 */
+  const gasF = F[0];
+  bgX.fillStyle = cv2('--tx2'); 
+  bgX.font = "700 10px 'IBM Plex Mono'"; 
+  bgX.textAlign = 'right';
+  bgX.fillText('~20℃', TW.x - 6, gasF.yt + 12);
 
   bgX.strokeStyle = dk ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)'; bgX.lineWidth = 1; bgX.setLineDash([3,5]);
   bgX.beginPath(); bgX.moveTo(TW.x+TRAY_GAP, TW.y+10); bgX.lineTo(TW.x+TRAY_GAP, TW.y+TW.h-10); bgX.stroke(); bgX.setLineDash([]);
@@ -619,10 +678,32 @@ function drawUI(){
   // 가열로 목표 온도 글씨를 온도 컨트롤러 셋 상단(온도 올리기 위)으로 이동
   X.fillText('가열로 목표 온도', rT.x + rT.w/2, rT.y - 12);
   
-  X.fillStyle = cv2('--tx3'); X.font = "700 12px Pretendard"; X.textAlign = 'right'; X.fillText('ⓒ 송쌤과학', W-20, H-24);
-  X.font = "500 10px 'IBM Plex Mono'"; X.fillText('가상실험실', W-20, H-10);
+  /* ═══ 가열 시작 전 안내 메시지 ═══ */
+  /* 원유 주입 후 온도를 올리지 않으면 분리되지 않음을 안내 */
+  if(!heatStarted && pts.length > 0 && pts.some(p => p.st === 'fur')) {
+      const pulse = Math.sin(aT * 3) * 0.3 + 0.7;
+      X.save();
+      X.globalAlpha = pulse;
+      X.fillStyle = '#ff4020';
+      X.font = "800 14px Pretendard";
+      X.textAlign = 'center';
+      const msg = "⬆ 온도를 올려야 원유가 기화됩니다! ⬆";
+      const msgW = X.measureText(msg).width + 20;
+      const msgX = FN.x + FN.w / 2;
+      const msgY = FN.y - 14;
+      X.fillStyle = dk ? 'rgba(69,26,26,0.95)' : 'rgba(255,234,234,0.95)';
+      rr(X, msgX - msgW/2, msgY - 18, msgW, 24, 12); X.fill();
+      X.strokeStyle = '#ff4020'; X.lineWidth = 2;
+      rr(X, msgX - msgW/2, msgY - 18, msgW, 24, 12); X.stroke();
+      X.fillStyle = dk ? '#ff9988' : '#cc1100';
+      X.fillText(msg, msgX, msgY - 2);
+      X.restore();
+  }
+  
+  X.fillStyle = cv2('--tx3'); X.font = "700 12px Pretendard"; X.textAlign = 'right'; X.fillText('ⓒ 송쌤과학', W-20, H-40);
+  X.font = "500 10px 'IBM Plex Mono'"; X.fillText('가상실험실 | 중2 과학', W-20, H-24);
   X.fillStyle = cv2('--tx3'); X.font = "600 12px Pretendard"; X.textAlign = 'center';
-  X.fillText('원유를 가열하여 기화시킵니다 → 증류탑을 올라가며 끓는점이 높은 순으로 액화 분리됩니다.', W/2, H-20);
+  X.fillText('원유를 가열하여 기화시킵니다 → 증류탑을 올라가며 끓는점이 높은 순으로 액화 분리됩니다.', W/2, H-48);
 }
 
 function drawBtn(ctx, r, c, t, fSize = 14){
