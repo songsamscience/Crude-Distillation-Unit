@@ -133,10 +133,11 @@ const BT = {
     ful: {x: 958, y: 15, w: 122, h: 32},
     inj: {x: 20, y: 90, w: 140, h: 42},
     rst: {x: 170, y: 90, w: 140, h: 42},
-    tp:  {x: 20, y: 140, w: 140, h: 36},
-    rf:  {x: 170, y: 140, w: 140, h: 36},
-    tup: {x: 20, y: 210, w: 140, h: 36},
-    tdn: {x: 20, y: 295, w: 140, h: 36}
+    auto:{x: 20, y: 140, w: 290, h: 32},
+    tp:  {x: 20, y: 180, w: 140, h: 32},
+    rf:  {x: 170, y: 180, w: 140, h: 32},
+    tup: {x: 20, y: 250, w: 140, h: 36},
+    tdn: {x: 20, y: 335, w: 140, h: 36}
 };
 
 const F = [
@@ -161,6 +162,9 @@ let truck = { x: -200, y: 540, st: 'idle', tk: 0, cnt: 0 };
 let heatStarted = false;
 let valveOpen = false;
 let valveAngle = 0;
+/* ═══ 자동급유 모드 ═══ */
+let autoSupply = false;
+let autoWaitTk = 0;  /* 자동 모드에서 다음 트럭 호출까지의 대기 시간 카운터 */
 
 /* ═══ 고해상도 렌더링 (Retina/전체화면 대응) ═══ */
 let renderScale = 1;
@@ -300,6 +304,7 @@ function reset(){
     cT = 0; tT = 0; done = false; ejN = 0; pts = []; rfxUp = []; rfxDn = []; aLbl = null; 
     truck.st = 'idle'; truck.x = -200; tInp.value = 0;
     heatStarted = false; valveOpen = false; valveAngle = 0;
+    autoSupply = false; autoWaitTk = 0;
 }
 function callTruck(){ 
     if(truck.st === 'idle' || truck.st === 'out') { 
@@ -323,12 +328,27 @@ function updateTruck() {
         if(truck.tk > 160) { truck.st = 'out'; }
     } else if(truck.st === 'out') {
         truck.x -= 4.5;
-        if(truck.x < -200) truck.st = 'idle';
+        if(truck.x < -200) {
+            truck.st = 'idle';
+            /* 자동급유 모드면 대기 카운터 시작 */
+            if(autoSupply) autoWaitTk = 0;
+        }
+    }
+    
+    /* ═══ 자동급유 로직: 트럭이 idle 상태일 때 일정 시간 후 자동 호출 ═══ */
+    /* 트럭 1사이클(in→pour→out): 약 60+160+60 = 280틱
+       대기시간 60틱(약 1초) 추가 → 기존 수동 호출 속도와 비슷한 리듬 유지 */
+    if(autoSupply && truck.st === 'idle') {
+        autoWaitTk++;
+        if(autoWaitTk > 60) {
+            callTruck();
+            autoWaitTk = 0;
+        }
     }
 }
 
 function intro(){ showD(
-  "1. '🛢️ 원유 주입'으로 유조차를 불러 원유를 넣으세요.\n\n"+
+  "1. '🛢️ 원유 주입' 또는 '🔁 자동 급유'로 유조차를 불러 원유를 넣으세요.\n\n"+
   "2. 온도를 직접 타이핑하거나 [▲/▼] 버튼을 눌러 가열하세요.\n\n"+
   "3. 🔒 파이프 중간의 밸브를 클릭하여 여세요!\n   ※ 밸브를 열어야 기화된 분자가 증류탑으로 이동합니다.\n\n"+
   "4. 끓는점에 도달한 성분이 기화되어 파이프를 통해 증류탑 위로 분리됩니다.\n\n"+
@@ -366,6 +386,15 @@ function oD(e){
   if(hit(p, BT.ful)){ tFS(); return; }
   if(hit(p, BT.rst)){ reset(); intro(); return; }
   if(hit(p, BT.inj)){ callTruck(); return; } 
+  if(hit(p, BT.auto)){ 
+      autoSupply = !autoSupply; 
+      if(autoSupply){ 
+          /* 자동급유 켜면 즉시 첫 트럭 호출 */
+          if(truck.st === 'idle') callTruck();
+          autoWaitTk = 0;
+      }
+      return; 
+  }
   if(hit(p, BT.tp)){ showTP = !showTP; return; }
   if(hit(p, BT.rf)){ showRF = !showRF; return; }
   if(hit(p, BT.tup)){ isTUp = true; heatStarted = true; return; } 
@@ -409,7 +438,7 @@ function loop(){
 
   let ac = 0; pts.forEach(p => { p.update(); if(p.st !== 'dn') ac++; });
   pts = pts.filter(p => p.st !== 'dn');
-  done = (ac === 0 && ejN > 0 && truck.st === 'idle');
+  done = (ac === 0 && ejN > 0 && truck.st === 'idle' && !autoSupply);
 
   if(showRF && cT > 100){
     if(Math.random() < .08) rfxUp.push(new RfxRise());
@@ -776,6 +805,10 @@ function drawUI(){
   
   drawBtn(X, BT.inj, '#105080', '🛢️ 원유 주입');
   drawBtn(X, BT.rst, done ? '#c02505' : '#885020', done ? '🔄 다시하기' : '↺ 초기화');
+  
+  /* ═══ 자동급유 토글 버튼 (특별 디자인 - 활성시 펄스 효과) ═══ */
+  drawAutoBtn(X, BT.auto, autoSupply);
+  
   drawToggle(X, BT.tp, '🌡️ 온도분포 표시', showTP);
   drawToggle(X, BT.rf, '🔄 환류 원리 표시', showRF);
   drawBtn(X, BT.thm, dk ? '#354560' : '#8a95a5', dk ? '☀️ 라이트 모드' : '🌙 다크 모드', 12);
@@ -828,6 +861,75 @@ function drawBtn(ctx, r, c, t, fSize = 14){
 function drawToggle(ctx, r, t, on){
   ctx.fillStyle = on ? 'rgba(25,130,70,.85)' : 'rgba(100,110,120,.35)'; rr(ctx, r.x, r.y, r.w, r.h, 6); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.font = "700 12px Pretendard"; ctx.textAlign = 'center'; ctx.fillText(t, r.x + r.w/2, r.y + r.h/2 + 4);
+}
+
+/* ═══ 자동급유 전용 버튼 (활성시 그라디언트 + 펄스 효과) ═══ */
+function drawAutoBtn(ctx, r, on){
+    ctx.save();
+    
+    if(on){
+        /* 활성 상태: 펄스 글로우 효과 */
+        const pulse = Math.sin(aT * 3) * 0.3 + 0.7;
+        ctx.shadowColor = `rgba(34, 197, 94, ${pulse})`;
+        ctx.shadowBlur = 12;
+        
+        const grad = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y);
+        grad.addColorStop(0, '#16a34a');
+        grad.addColorStop(0.5, '#22c55e');
+        grad.addColorStop(1, '#16a34a');
+        ctx.fillStyle = grad;
+        rr(ctx, r.x, r.y, r.w, r.h, 8); ctx.fill();
+        
+        ctx.shadowBlur = 0;
+        
+        /* 회전 아이콘 효과 */
+        const iconX = r.x + 15;
+        const iconY = r.y + r.h/2;
+        ctx.save();
+        ctx.translate(iconX, iconY);
+        ctx.rotate(aT * 2);
+        ctx.font = "800 14px Pretendard";
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🔁', 0, 0);
+        ctx.restore();
+        
+        ctx.fillStyle = '#fff'; 
+        ctx.font = "800 13px Pretendard"; 
+        ctx.textAlign = 'center'; 
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText('자동 급유 ON  (눌러서 OFF)', r.x + r.w/2 + 8, r.y + r.h/2 + 5);
+        
+        /* 진행 상태 표시 (트럭 상태에 따라) */
+        let statusTxt = '';
+        if(truck.st === 'in') statusTxt = '🚛 진입 중...';
+        else if(truck.st === 'pour') statusTxt = '⛽ 주입 중...';
+        else if(truck.st === 'out') statusTxt = '🚛 후진 중...';
+        else if(truck.st === 'idle') statusTxt = `⏳ 다음 트럭 대기 (${Math.ceil((60 - autoWaitTk) / 60)}초)`;
+        
+        if(statusTxt){
+            ctx.font = "600 10px 'IBM Plex Mono'";
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            /* 진행 텍스트는 버튼 위쪽에 살짝 표시 */
+        }
+    } else {
+        /* 비활성 상태: 일반 버튼 */
+        ctx.fillStyle = dk ? 'rgba(60, 80, 110, 0.7)' : 'rgba(150, 170, 200, 0.5)';
+        rr(ctx, r.x, r.y, r.w, r.h, 8); ctx.fill();
+        ctx.strokeStyle = dk ? 'rgba(120, 160, 220, 0.4)' : 'rgba(80, 110, 150, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 3]);
+        rr(ctx, r.x, r.y, r.w, r.h, 8); ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.fillStyle = '#fff'; 
+        ctx.font = "800 13px Pretendard"; 
+        ctx.textAlign = 'center'; 
+        ctx.fillText('🔁 자동 급유  (연속 공급)', r.x + r.w/2, r.y + r.h/2 + 5);
+    }
+    
+    ctx.restore();
 }
 
 function render(){
