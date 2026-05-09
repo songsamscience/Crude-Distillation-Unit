@@ -40,7 +40,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 #tempInp {
     position: absolute;
-    left: 1.818%; top: 37.878%; width: 12.727%; height: 6.060%;
+    left: 1.818%; top: 37.878%; width: 8.0%; height: 6.060%;
     background: var(--card);
     border: 2.5px solid #2070d0;
     border-radius: 8px;
@@ -136,8 +136,8 @@ const BT = {
     auto:{x: 20, y: 140, w: 290, h: 32},
     tp:  {x: 20, y: 180, w: 140, h: 32},
     rf:  {x: 170, y: 180, w: 140, h: 32},
-    tup: {x: 20, y: 250, w: 140, h: 36},
-    tdn: {x: 20, y: 335, w: 140, h: 36}
+    tup: {x: 116, y: 250, w: 90, h: 19},
+    tdn: {x: 116, y: 271, w: 90, h: 19}
 };
 
 const F = [
@@ -814,20 +814,31 @@ function drawUI(){
   drawBtn(X, BT.thm, dk ? '#354560' : '#8a95a5', dk ? '☀️ 라이트 모드' : '🌙 다크 모드', 12);
   drawBtn(X, BT.ful, dk ? '#354560' : '#8a95a5', '⛶ 전체 화면', 12);
   
+  /* 가열로 목표 온도 라벨 (전광판 위쪽) */
+  X.fillStyle = cv2('--tx2'); X.font = "800 13px Pretendard"; X.textAlign = 'left';
+  X.fillText('🌡️ 가열로 목표 온도 (℃)', 20, 240);
+  
   const rT = BT.tup, rD = BT.tdn;
-  X.fillStyle = isTUp ? cv2('--acc2') : cv2('--acc'); rr(X, rT.x, rT.y, rT.w, rT.h, 8); X.fill();
-  X.fillStyle = '#fff'; X.font = "800 15px Pretendard"; X.textAlign = 'center'; X.fillText("▲ 온도 올리기", rT.x + rT.w/2, rT.y + 23);
+  X.save();
+  X.shadowColor = 'rgba(0,0,0,0.25)'; X.shadowBlur = 4; X.shadowOffsetY = 2;
+  X.fillStyle = isTUp ? cv2('--acc2') : cv2('--acc'); 
+  rr(X, rT.x, rT.y, rT.w, rT.h, 5); X.fill();
+  X.restore();
+  X.fillStyle = '#fff'; X.font = "800 12px Pretendard"; X.textAlign = 'center'; 
+  X.fillText("▲ 온도 올리기", rT.x + rT.w/2, rT.y + 14);
 
-  X.fillStyle = isTDn ? cv2('--tx3') : (dk ? '#3a4a5a' : '#98a8b8'); rr(X, rD.x, rD.y, rD.w, rD.h, 8); X.fill();
-  X.fillStyle = '#fff'; X.font = "800 15px Pretendard"; X.fillText("▼ 온도 내리기", rD.x + rD.w/2, rD.y + 23);
+  X.save();
+  X.shadowColor = 'rgba(0,0,0,0.25)'; X.shadowBlur = 4; X.shadowOffsetY = 2;
+  X.fillStyle = isTDn ? cv2('--tx3') : (dk ? '#3a4a5a' : '#98a8b8'); 
+  rr(X, rD.x, rD.y, rD.w, rD.h, 5); X.fill();
+  X.restore();
+  X.fillStyle = '#fff'; X.font = "800 12px Pretendard"; 
+  X.fillText("▼ 온도 내리기", rD.x + rD.w/2, rD.y + 14);
 
   const cr = cT / 450;
   const tCol = cr > 0.6 ? '#e03010' : '#2070d0';
   tInp.style.borderColor = tCol;
   tInp.style.color = tCol;
-  
-  X.fillStyle = cv2('--tx2'); X.font = "700 13px Pretendard"; 
-  X.fillText('가열로 목표 온도', rT.x + rT.w/2, rT.y - 12);
   
   if(!heatStarted && pts.length > 0 && pts.some(p => p.st === 'fur')) {
       const pulse = Math.sin(aT * 3) * 0.3 + 0.7;
