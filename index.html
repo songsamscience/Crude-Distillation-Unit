@@ -45,20 +45,6 @@ body.is-gesturing #app { transition: none; }
     border-radius: 0; box-shadow: none;
 }
 
-/* ═══ 모바일 세로모드: 가로형 실험을 화면에 맞춰 90° 자동 회전 ═══ */
-/* 캔버스 비율(1100:660)을 유지한 채 세로 화면 폭에 꽉 차게 키운다.        */
-body.rotate-app #app,
-body.rotate-app:fullscreen #app,
-body.rotate-app:-webkit-full-screen #app {
-    aspect-ratio: 1100 / 660 !important;
-    width: auto !important;
-    height: min(100vw, calc(var(--app-vh, 100dvh) * 660 / 1100)) !important;
-    max-width: none !important;
-    max-height: none !important;
-    border-radius: 0; box-shadow: none;
-    transform: translate(var(--view-x), var(--view-y)) rotate(90deg) scale(var(--view-scale));
-}
-
 canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
 #tempInp {
@@ -188,7 +174,7 @@ body.modal-open .ov { pointer-events: auto; }
     <div class="dg">
         <h2>🧪 원유의 분별 증류 가상실험</h2>
         <p id="mg"></p>
-        <button id="dgBtn" onclick="clD()">실험 시작하기</button>
+        <button id="dgBtn">실험 시작하기</button>
     </div>
 </div>
 <script>
@@ -550,7 +536,9 @@ function onTouchMove(e){
   }
 }
 function onTouchEnd(e){
-  e.preventDefault();
+  /* 캔버스 제스처가 아니면(모달 버튼 등 다른 요소 탭) 기본 클릭을 막지 않는다 */
+  if(touchMode === null) return;
+  if(e.cancelable) e.preventDefault();
   document.body.classList.remove('is-gesturing');
   if(touchMode === 'pinch'){
     touchMode = null;
@@ -577,10 +565,6 @@ function gp(e){
   const r = cv.getBoundingClientRect();
   let x = e.clientX, y = e.clientY;
   if(e.touches && e.touches.length){ x = e.touches[0].clientX; y = e.touches[0].clientY; if(e.cancelable) e.preventDefault(); }
-  /* 세로모드 자동 회전(90° CW) 시: 화면 좌표를 캔버스 좌표로 역변환 */
-  if(document.body.classList.contains('rotate-app')){
-    return { x: (y - r.top) / r.height * W, y: (r.width - (x - r.left)) / r.width * H };
-  }
   return { x: (x - r.left) * (W / r.width), y: (y - r.top) * (H / r.height) };
 }
 function oD(e){
@@ -1245,25 +1229,10 @@ function setAppViewportHeight(){
   if(typeof applyView === 'function') applyView();
 }
 
-/* ═══ 세로 휴대폰 감지 → 실험 화면 자동 회전 모드 토글 ═══ */
-let _wasRotated = false;
-function updateOrientationMode(){
-  const portrait = window.matchMedia('(orientation: portrait)').matches;
-  const coarse = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
-  const phone = Math.min(window.innerWidth, window.innerHeight) <= 600;
-  const should = portrait && coarse && phone;
-  document.body.classList.toggle('rotate-app', should);
-  if(should !== _wasRotated){
-    if(typeof resetView === 'function') resetView();
-    if(should && typeof showZoomHint === 'function') showZoomHint(true);
-    _wasRotated = should;
-  }
-}
-
-/* 뷰포트 변화(리사이즈/회전/키보드) 시 일괄 재배치 */
+/* 뷰포트 변화(리사이즈/방향전환/키보드) 시 일괄 재배치 — 항상 정방향(업라이트) 유지 */
 function relayout(){
+  document.body.classList.remove('rotate-app');
   setAppViewportHeight();
-  updateOrientationMode();
   if(typeof setupCanvas === 'function') setupCanvas();
 }
 
@@ -1308,6 +1277,22 @@ if(ovEl){
   el.addEventListener('touchstart', e => e.stopPropagation(), {passive:true});
   el.addEventListener('touchmove', e => e.stopPropagation(), {passive:true});
 });
+
+/* ═══ 시작/닫기 버튼: 터치·클릭 모두에서 확실히 반응하도록 직접 처리 ═══ */
+const dgBtn = document.getElementById('dgBtn');
+if(dgBtn){
+  let touchFired = false;
+  const fire = (e) => {
+    if(e){ if(e.cancelable) e.preventDefault(); e.stopPropagation(); }
+    clD();
+  };
+  dgBtn.addEventListener('touchend', (e) => { touchFired = true; fire(e); }, {passive:false});
+  dgBtn.addEventListener('click', (e) => {
+    /* 터치로 이미 처리됐다면 뒤따라오는 가짜 클릭은 무시(중복 방지) */
+    if(touchFired){ touchFired = false; return; }
+    fire(e);
+  });
+}
 window.onload = init;
 </script>
 </body>
