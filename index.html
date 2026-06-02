@@ -2,14 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
 <title>송쌤과학 - 원유의 분별 증류</title>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-:root { --app-vh: 100dvh; }
-html, body { width: 100%; height: 100%; min-height: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; touch-action: manipulation; font-family: 'Pretendard', sans-serif; }
+:root { --app-vh: 100dvh; --view-scale: 1; --view-x: 0px; --view-y: 0px; }
+html, body { width: 100%; height: 100%; min-height: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; touch-action: none; font-family: 'Pretendard', sans-serif; }
 body {
     --bg: #0d131f; --bg2: #141d2b; --bg3: #1c2838; --card: rgba(20, 30, 45, 0.9); 
     --tx: #e0e6ed; --tx2: #8a9fb8; --tx3: #4a6585; --acc: #ff8828; --acc2: #ff6810; 
@@ -29,7 +29,12 @@ body.light {
     max-width: 1100px; max-height: 660px;
     aspect-ratio: 1100 / 660; background: transparent; overflow: hidden;
     box-shadow: 0 15px 60px var(--shd); border-radius: 12px;
+    transform: translate(var(--view-x), var(--view-y)) scale(var(--view-scale));
+    transform-origin: center center;
+    transition: transform 0.04s linear;
+    will-change: transform;
 }
+body.is-gesturing #app { transition: none; }
 @media (max-aspect-ratio: 1100/660) { #app { height: auto; } }
 @media (min-aspect-ratio: 1100/660) { #app { width: auto; } }
 
@@ -40,17 +45,31 @@ body.light {
     border-radius: 0; box-shadow: none;
 }
 
+/* ═══ 모바일 세로모드: 가로형 실험을 화면에 맞춰 90° 자동 회전 ═══ */
+/* 캔버스 비율(1100:660)을 유지한 채 세로 화면 폭에 꽉 차게 키운다.        */
+body.rotate-app #app,
+body.rotate-app:fullscreen #app,
+body.rotate-app:-webkit-full-screen #app {
+    aspect-ratio: 1100 / 660 !important;
+    width: auto !important;
+    height: min(100vw, calc(var(--app-vh, 100dvh) * 660 / 1100)) !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0; box-shadow: none;
+    transform: translate(var(--view-x), var(--view-y)) rotate(90deg) scale(var(--view-scale));
+}
+
 canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
 #tempInp {
     position: absolute;
-    left: 1.818%; top: 37.878%; width: 8.0%; height: 6.060%;
+    left: 1.818%; top: 37.878%; width: 8.2%; height: 9.8%;
     background: var(--card);
     border: 2.5px solid #2070d0;
     border-radius: 8px;
     color: #2070d0;
     text-align: center;
-    font-size: clamp(18px, 2.2vw, 26px);
+    font-size: clamp(20px, 2.5vw, 30px);
     font-family: 'IBM Plex Mono', monospace;
     font-weight: 700;
     outline: none;
@@ -125,6 +144,7 @@ body.modal-open .ov { pointer-events: auto; }
     .dg p { font-size: 14px; line-height: 1.62; margin-bottom: 14px; }
     .dg button { padding: 15px 20px; font-size: 16px; }
     #linkBar { left: 10px; right: 10px; bottom: 8px; gap: 8px; font-size: 10px; }
+    #tempInp { min-width: 60px; min-height: 46px; border-width: 3px; }
 }
 
 @media (max-width: 480px) and (orientation: portrait) {
@@ -136,6 +156,19 @@ body.modal-open .ov { pointer-events: auto; }
 
 @media (hover: none) and (pointer: coarse) {
     .dg button:hover { transform: none; box-shadow: 0 -10px 22px rgba(0,0,0,0.08); }
+    #tempInp { font-size: clamp(22px, 4vw, 34px); }
+}
+#zoomHint {
+    position: fixed; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 30;
+    padding: 8px 12px; border-radius: 999px;
+    background: rgba(10, 16, 28, 0.72); color: rgba(255,255,255,0.88);
+    border: 1px solid rgba(255,255,255,0.16); font-size: 12px; font-weight: 800;
+    pointer-events: none; opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s;
+    backdrop-filter: blur(6px);
+}
+#zoomHint.show { opacity: 1; transform: translateY(0); }
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+    #zoomHint { opacity: .78; }
 }
 
 </style>
@@ -149,12 +182,13 @@ body.modal-open .ov { pointer-events: auto; }
         <span class="sep">|</span>
         <a class="lnk yt" href="https://www.youtube.com/@songsamscience" target="_blank">▶ 송쌤과학 YouTube</a>
     </div>
-    <div id="ov" class="ov">
-        <div class="dg">
-            <h2>🧪 원유의 분별 증류 가상실험</h2>
-            <p id="mg"></p>
-            <button onclick="clD()">실험 시작하기</button>
-        </div>
+</div>
+<div id="zoomHint">🔍 두 손가락으로 확대·축소 · 기기를 가로로 돌리면 더 크게 볼 수 있어요</div>
+<div id="ov" class="ov">
+    <div class="dg">
+        <h2>🧪 원유의 분별 증류 가상실험</h2>
+        <p id="mg"></p>
+        <button id="dgBtn" onclick="clD()">실험 시작하기</button>
     </div>
 </div>
 <script>
@@ -180,8 +214,8 @@ const BT = {
     auto:{x: 20, y: 140, w: 290, h: 32},
     tp:  {x: 20, y: 180, w: 140, h: 32},
     rf:  {x: 170, y: 180, w: 140, h: 32},
-    tup: {x: 116, y: 250, w: 90, h: 19},
-    tdn: {x: 116, y: 271, w: 90, h: 19}
+    tup: {x: 122, y: 248, w: 150, h: 34},
+    tdn: {x: 122, y: 286, w: 150, h: 34}
 };
 
 const F = [
@@ -215,9 +249,10 @@ let renderScale = 1;
 function setupCanvas(){
     const rect = cv.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    /* 실제 표시 픽셀 수에 맞춰 내부 해상도 스케일 결정 */
-    const scaleX = rect.width / W, scaleY = rect.height / H;
-    renderScale = Math.max(1, Math.min(scaleX, scaleY) * dpr);
+    /* 실제 표시 픽셀 수에 맞춰 내부 해상도 스케일 결정 (회전 시에도 긴 변↔W로 매핑) */
+    const longSide = Math.max(rect.width, rect.height);
+    const shortSide = Math.min(rect.width, rect.height);
+    renderScale = Math.max(1, Math.min(longSide / W, shortSide / H) * dpr);
     
     cv.width = Math.round(W * renderScale);
     cv.height = Math.round(H * renderScale);
@@ -399,19 +434,21 @@ function intro(){ showD(
   "5. 무거운 성분(잔류물)은 기화되지 않고 아래쪽으로 분리됩니다.\n\n"+
   "6. 이름표를 드래그하여 각 층의 물리적 상태(기체/액체)를 관찰하세요.\n\n"+
   "7. '🔄 환류 표시'로 순도를 높이는 기액 접촉 원리를 확인하세요.",
-  ()=>{}
+  ()=>{}, '실험 시작하기'
 );}
 
 function init(){
     reset();
-    setupCanvas();
+    relayout();
     
-    window.addEventListener('resize', () => { setupCanvas(); });
-    document.addEventListener('fullscreenchange', () => { setTimeout(setupCanvas, 100); });
-    document.addEventListener('webkitfullscreenchange', () => { setTimeout(setupCanvas, 100); });
+    document.addEventListener('fullscreenchange', () => { setTimeout(relayout, 120); });
+    document.addEventListener('webkitfullscreenchange', () => { setTimeout(relayout, 120); });
     
     cv.addEventListener('mousedown', oD); cv.addEventListener('mousemove', oM); window.addEventListener('mouseup', oU);
-    cv.addEventListener('touchstart', oD, {passive:false}); cv.addEventListener('touchmove', oM, {passive:false}); window.addEventListener('touchend', oU);
+    cv.addEventListener('touchstart', onTouchStart, {passive:false});
+    cv.addEventListener('touchmove', onTouchMove, {passive:false});
+    window.addEventListener('touchend', onTouchEnd, {passive:false});
+    window.addEventListener('touchcancel', onTouchEnd, {passive:false});
     
     tInp.addEventListener('input', (e) => {
         let val = parseInt(e.target.value) || 0;
@@ -422,8 +459,130 @@ function init(){
     });
 
     loop(); intro();
+    if((window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) || window.innerWidth < 900) showZoomHint(true);
 }
-function gp(e){const r=cv.getBoundingClientRect();let x=e.clientX,y=e.clientY;if(e.touches&&e.touches.length){x=e.touches[0].clientX;y=e.touches[0].clientY;e.preventDefault()}return{x:(x-r.left)*(W/r.width),y:(y-r.top)*(H/r.height)}}
+
+/* ═══ 모바일/태블릿 제스처 확대·축소 + 팬 이동 ═══ */
+let viewScale = 1, viewX = 0, viewY = 0;
+let touchMode = null, startDist = 0, startScale = 1, startX = 0, startY = 0, startViewX = 0, startViewY = 0;
+let touchDownEvent = null, touchMoved = false, lastTapTime = 0;
+const MIN_ZOOM = 1, MAX_ZOOM = 3.2;
+function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+function applyView(){
+  viewScale = clamp(viewScale, MIN_ZOOM, MAX_ZOOM);
+  const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const r = cv.getBoundingClientRect();
+  const maxX = Math.max(0, (r.width * (viewScale - 1)) / 2 + vw * 0.35);
+  const maxY = Math.max(0, (r.height * (viewScale - 1)) / 2 + vh * 0.35);
+  viewX = clamp(viewX, -maxX, maxX);
+  viewY = clamp(viewY, -maxY, maxY);
+  document.documentElement.style.setProperty('--view-scale', viewScale.toFixed(3));
+  document.documentElement.style.setProperty('--view-x', `${viewX.toFixed(1)}px`);
+  document.documentElement.style.setProperty('--view-y', `${viewY.toFixed(1)}px`);
+}
+function resetView(){ viewScale = 1; viewX = 0; viewY = 0; applyView(); }
+function touchDistance(touches){
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.hypot(dx, dy);
+}
+function showZoomHint(active=true){
+  const el = document.getElementById('zoomHint');
+  if(!el) return;
+  el.classList.add('show');
+  clearTimeout(showZoomHint._t);
+  if(active) showZoomHint._t = setTimeout(()=>el.classList.remove('show'), 1800);
+}
+function onTouchStart(e){
+  if(e.touches.length >= 2){
+    e.preventDefault();
+    document.body.classList.add('is-gesturing');
+    touchMode = 'pinch';
+    startDist = touchDistance(e.touches);
+    startScale = viewScale;
+    startViewX = viewX; startViewY = viewY;
+    const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    startX = cx; startY = cy;
+    showZoomHint(false);
+    return;
+  }
+  if(e.touches.length === 1){
+    e.preventDefault();
+    document.body.classList.add('is-gesturing');
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+    startViewX = viewX; startViewY = viewY;
+    touchMoved = false;
+    touchDownEvent = {clientX: startX, clientY: startY, touches: [{clientX: startX, clientY: startY}], preventDefault(){}};
+    // 확대 상태에서는 한 손가락 드래그를 화면 이동으로 우선 처리한다. 탭은 그대로 실험 버튼 클릭으로 전달한다.
+    touchMode = viewScale > 1.03 ? 'maybePan' : 'tap';
+  }
+}
+function onTouchMove(e){
+  if(e.touches.length >= 2 && touchMode === 'pinch'){
+    e.preventDefault();
+    const dist = touchDistance(e.touches);
+    const nextScale = clamp(startScale * (dist / Math.max(1, startDist)), MIN_ZOOM, MAX_ZOOM);
+    const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    // 손가락 중심이 움직이면 확대와 동시에 자연스럽게 따라가도록 보정
+    viewX = startViewX + (cx - startX);
+    viewY = startViewY + (cy - startY);
+    viewScale = nextScale;
+    applyView();
+    return;
+  }
+  if(e.touches.length === 1){
+    e.preventDefault();
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if(Math.hypot(dx, dy) > 8) touchMoved = true;
+    if((touchMode === 'maybePan' || touchMode === 'pan') && touchMoved){
+      touchMode = 'pan';
+      viewX = startViewX + dx;
+      viewY = startViewY + dy;
+      applyView();
+    } else if(touchMode === 'tap'){
+      // 확대하지 않은 상태에서는 기존 실험 드래그 조작을 유지한다.
+      oM(e);
+    }
+  }
+}
+function onTouchEnd(e){
+  e.preventDefault();
+  document.body.classList.remove('is-gesturing');
+  if(touchMode === 'pinch'){
+    touchMode = null;
+    if(viewScale < 1.08) resetView();
+    showZoomHint(true);
+    return;
+  }
+  if(touchMode === 'tap'){
+    if(!touchMoved && touchDownEvent) {
+      const now = Date.now();
+      if(now - lastTapTime < 320 && viewScale > 1.03){ resetView(); lastTapTime = 0; }
+      else { oD(touchDownEvent); lastTapTime = now; }
+    }
+    oU();
+  } else if(touchMode === 'maybePan'){
+    // 확대 상태에서도 짧은 탭은 버튼 클릭으로 처리한다.
+    if(!touchMoved && touchDownEvent) oD(touchDownEvent);
+    oU();
+  }
+  touchMode = null; touchDownEvent = null; touchMoved = false;
+}
+
+function gp(e){
+  const r = cv.getBoundingClientRect();
+  let x = e.clientX, y = e.clientY;
+  if(e.touches && e.touches.length){ x = e.touches[0].clientX; y = e.touches[0].clientY; if(e.cancelable) e.preventDefault(); }
+  /* 세로모드 자동 회전(90° CW) 시: 화면 좌표를 캔버스 좌표로 역변환 */
+  if(document.body.classList.contains('rotate-app')){
+    return { x: (y - r.top) / r.height * W, y: (r.width - (x - r.left)) / r.width * H };
+  }
+  return { x: (x - r.left) * (W / r.width), y: (y - r.top) * (H / r.height) };
+}
 function oD(e){
   const p = gp(e);
   if(hit(p, BT.thm)){ dk = !dk; document.body.classList.toggle('light', !dk); bgCached = false; return; }
@@ -459,7 +618,7 @@ function oM(e){
 }
 function oU(){
   isTUp = false; isTDn = false; 
-  if(pDr){ showD(`[ ${pDr.nm} ]  ${pDr.C}\n끓는점: ${pDr.nfo}\n\n📌 용도\n${pDr.use}\n\n🔬 특징\n${pDr.mol}`); pDr = null; }
+  if(pDr){ showD(`[ ${pDr.nm} ]  ${pDr.C}\n끓는점: ${pDr.nfo}\n\n📌 용도\n${pDr.use}\n\n🔬 특징\n${pDr.mol}`, null, '닫기'); pDr = null; }
   if(isDrF){ const ins = mx >= TW.x - 12 && mx <= TW.x + TW.w + 12 && my >= TW.y && my <= TW.y + TW.h; if(ins) aLbl = {f: dFr, x: mx, y: my, st: 'f'}; isDrF = false; dFr = null; }
 }
 
@@ -868,16 +1027,16 @@ function drawUI(){
   X.fillStyle = isTUp ? cv2('--acc2') : cv2('--acc'); 
   rr(X, rT.x, rT.y, rT.w, rT.h, 5); X.fill();
   X.restore();
-  X.fillStyle = '#fff'; X.font = "800 12px Pretendard"; X.textAlign = 'center'; 
-  X.fillText("▲ 온도 올리기", rT.x + rT.w/2, rT.y + 14);
+  X.fillStyle = '#fff'; X.font = "900 15px Pretendard"; X.textAlign = 'center'; 
+  X.fillText("▲ 온도 올리기", rT.x + rT.w/2, rT.y + 22);
 
   X.save();
   X.shadowColor = 'rgba(0,0,0,0.25)'; X.shadowBlur = 4; X.shadowOffsetY = 2;
   X.fillStyle = isTDn ? cv2('--tx3') : (dk ? '#3a4a5a' : '#98a8b8'); 
   rr(X, rD.x, rD.y, rD.w, rD.h, 5); X.fill();
   X.restore();
-  X.fillStyle = '#fff'; X.font = "800 12px Pretendard"; 
-  X.fillText("▼ 온도 내리기", rD.x + rD.w/2, rD.y + 14);
+  X.fillStyle = '#fff'; X.font = "900 15px Pretendard"; 
+  X.fillText("▼ 온도 내리기", rD.x + rD.w/2, rD.y + 22);
 
   const cr = cT / 450;
   const tCol = cr > 0.6 ? '#e03010' : '#2070d0';
@@ -1083,14 +1242,40 @@ let mcb = null;
 function setAppViewportHeight(){
   const vh = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
   document.documentElement.style.setProperty('--app-vh', `${vh}px`);
+  if(typeof applyView === 'function') applyView();
 }
-setAppViewportHeight();
-window.addEventListener('resize', setAppViewportHeight);
-window.addEventListener('orientationchange', () => setTimeout(setAppViewportHeight, 250));
-if(window.visualViewport) window.visualViewport.addEventListener('resize', setAppViewportHeight);
 
-function showD(m, cb = null){
+/* ═══ 세로 휴대폰 감지 → 실험 화면 자동 회전 모드 토글 ═══ */
+let _wasRotated = false;
+function updateOrientationMode(){
+  const portrait = window.matchMedia('(orientation: portrait)').matches;
+  const coarse = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+  const phone = Math.min(window.innerWidth, window.innerHeight) <= 600;
+  const should = portrait && coarse && phone;
+  document.body.classList.toggle('rotate-app', should);
+  if(should !== _wasRotated){
+    if(typeof resetView === 'function') resetView();
+    if(should && typeof showZoomHint === 'function') showZoomHint(true);
+    _wasRotated = should;
+  }
+}
+
+/* 뷰포트 변화(리사이즈/회전/키보드) 시 일괄 재배치 */
+function relayout(){
+  setAppViewportHeight();
+  updateOrientationMode();
+  if(typeof setupCanvas === 'function') setupCanvas();
+}
+
+relayout();
+window.addEventListener('resize', relayout);
+window.addEventListener('orientationchange', () => setTimeout(relayout, 250));
+if(window.visualViewport) window.visualViewport.addEventListener('resize', relayout);
+
+function showD(m, cb = null, btnLabel = '확인'){
   document.getElementById('mg').innerText = m;
+  const btn = document.getElementById('dgBtn');
+  if(btn) btn.textContent = btnLabel;
   const ov = document.getElementById('ov');
   const dg = ov.querySelector('.dg');
   const msg = document.getElementById('mg');
