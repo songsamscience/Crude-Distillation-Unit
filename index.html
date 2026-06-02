@@ -292,6 +292,18 @@ function hitCircle(p, cx, cy, r){ return Math.hypot(p.x-cx, p.y-cy) <= r; }
 function cv2(v){return getComputedStyle(document.body).getPropertyValue(v).trim()}
 function nr(m,s){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.max(m-s*3,Math.min(m+s*3,Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)*s+m))}
 
+/* ═══ 글씨가 칸 밖으로 넘치지 않도록 폭에 맞춰 폰트 크기를 자동 축소 ═══ */
+function fitFont(ctx, text, weight, maxFs, maxW, family){
+  family = family || "Pretendard, sans-serif";
+  let fs = maxFs;
+  ctx.font = `${weight} ${fs}px ${family}`;
+  while(fs > 8 && ctx.measureText(text).width > maxW){
+    fs -= 0.5;
+    ctx.font = `${weight} ${fs}px ${family}`;
+  }
+  return fs;
+}
+
 function drawTextBg(ctx, txt, x, y, bgCol, txtCol, font, pad = 6) {
     ctx.font = font;
     const w = ctx.measureText(txt).width;
@@ -474,6 +486,12 @@ function init(){
 
     loop(); intro();
     if((window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) || window.innerWidth < 900) showZoomHint(true);
+
+    /* 웹폰트(Pretendard)가 늦게 로드되면 글자 폭이 달라질 수 있으므로, 로드 완료 후 다시 그린다 */
+    if(document.fonts && document.fonts.ready){
+        document.fonts.ready.then(() => { bgCached = false; });
+        document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', () => { bgCached = false; });
+    }
 }
 
 /* ═══ 모바일/태블릿 제스처 확대·축소 + 팬 이동 ═══ */
@@ -980,24 +998,26 @@ function drawTowerDynamic(ctx){
     ctx.strokeStyle = dk ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)';
     ctx.lineWidth = 1.5; rr(ctx, bx, TW.y, bw, TW.h, 7); ctx.stroke();
     
-    ctx.font = "800 14px Pretendard";
+    ctx.font = "800 14px Pretendard, sans-serif";
+    ctx.textBaseline = 'middle';
     const topTxt = "❄️ 낮은 온도";
-    const topW = ctx.measureText(topTxt).width + 24;
+    const topW = ctx.measureText(topTxt).width + 34;
     ctx.fillStyle = dk ? 'rgba(26,43,69,0.95)' : 'rgba(234,244,255,0.95)';
     rr(ctx, bx + bw/2 - topW/2, TW.y - 38, topW, 30, 15); ctx.fill();
     ctx.strokeStyle = '#3aa0ff'; ctx.lineWidth = 2;
     rr(ctx, bx + bw/2 - topW/2, TW.y - 38, topW, 30, 15); ctx.stroke();
     ctx.fillStyle = dk ? '#77bdff' : '#0055b3';
-    ctx.textAlign = 'center'; ctx.fillText(topTxt, bx + bw/2, TW.y - 18);
+    ctx.textAlign = 'center'; ctx.fillText(topTxt, bx + bw/2, TW.y - 22);
     
     const botTxt = "🔥 높은 온도";
-    const botW = ctx.measureText(botTxt).width + 24;
+    const botW = ctx.measureText(botTxt).width + 34;
     ctx.fillStyle = dk ? 'rgba(69,26,26,0.95)' : 'rgba(255,234,234,0.95)';
     rr(ctx, bx + bw/2 - botW/2, TW.y + TW.h + 8, botW, 30, 15); ctx.fill();
     ctx.strokeStyle = '#ff4020'; ctx.lineWidth = 2;
     rr(ctx, bx + bw/2 - botW/2, TW.y + TW.h + 8, botW, 30, 15); ctx.stroke();
     ctx.fillStyle = dk ? '#ff7766' : '#cc1100';
-    ctx.fillText(botTxt, bx + bw/2, TW.y + TW.h + 28);
+    ctx.fillText(botTxt, bx + bw/2, TW.y + TW.h + 24);
+    ctx.textBaseline = 'alphabetic';
   }
   if(showRF && cT > 100){
     const s1 = Math.sin(aT * 3) * 5;
@@ -1039,16 +1059,19 @@ function drawUI(){
   X.fillStyle = isTUp ? cv2('--acc2') : cv2('--acc'); 
   rr(X, rT.x, rT.y, rT.w, rT.h, 5); X.fill();
   X.restore();
-  X.fillStyle = '#fff'; X.font = "900 15px Pretendard"; X.textAlign = 'center'; 
-  X.fillText("▲ 온도 올리기", rT.x + rT.w/2, rT.y + 22);
+  X.fillStyle = '#fff'; X.textAlign = 'center'; X.textBaseline = 'middle';
+  fitFont(X, "▲ 온도 올리기", 900, 15, rT.w - 16);
+  X.fillText("▲ 온도 올리기", rT.x + rT.w/2, rT.y + rT.h/2 + 1);
 
   X.save();
   X.shadowColor = 'rgba(0,0,0,0.25)'; X.shadowBlur = 4; X.shadowOffsetY = 2;
   X.fillStyle = isTDn ? cv2('--tx3') : (dk ? '#3a4a5a' : '#98a8b8'); 
   rr(X, rD.x, rD.y, rD.w, rD.h, 5); X.fill();
   X.restore();
-  X.fillStyle = '#fff'; X.font = "900 15px Pretendard"; 
-  X.fillText("▼ 온도 내리기", rD.x + rD.w/2, rD.y + 22);
+  X.fillStyle = '#fff';
+  fitFont(X, "▼ 온도 내리기", 900, 15, rD.w - 16);
+  X.fillText("▼ 온도 내리기", rD.x + rD.w/2, rD.y + rD.h/2 + 1);
+  X.textBaseline = 'alphabetic';
 
   const cr = cT / 450;
   const tCol = cr > 0.6 ? '#e03010' : '#2070d0';
@@ -1082,11 +1105,19 @@ function drawUI(){
 
 function drawBtn(ctx, r, c, t, fSize = 14){
   ctx.fillStyle = c; rr(ctx, r.x, r.y, r.w, r.h, 8); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = `800 ${fSize}px Pretendard`; ctx.textAlign = 'center'; ctx.fillText(t, r.x + r.w/2, r.y + r.h/2 + 5);
+  ctx.fillStyle = '#fff';
+  fitFont(ctx, t, 800, fSize, r.w - 16);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(t, r.x + r.w/2, r.y + r.h/2 + 1);
+  ctx.textBaseline = 'alphabetic';
 }
 function drawToggle(ctx, r, t, on){
   ctx.fillStyle = on ? 'rgba(25,130,70,.85)' : 'rgba(100,110,120,.35)'; rr(ctx, r.x, r.y, r.w, r.h, 6); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = "700 12px Pretendard"; ctx.textAlign = 'center'; ctx.fillText(t, r.x + r.w/2, r.y + r.h/2 + 4);
+  ctx.fillStyle = '#fff';
+  fitFont(ctx, t, 700, 12, r.w - 14);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(t, r.x + r.w/2, r.y + r.h/2 + 1);
+  ctx.textBaseline = 'alphabetic';
 }
 
 /* ═══ 자동급유 전용 버튼 (활성시 그라디언트 + 펄스 효과) ═══ */
@@ -1122,10 +1153,11 @@ function drawAutoBtn(ctx, r, on){
         ctx.restore();
         
         ctx.fillStyle = '#fff'; 
-        ctx.font = "800 13px Pretendard"; 
         ctx.textAlign = 'center'; 
+        ctx.textBaseline = 'middle';
+        fitFont(ctx, '자동 급유 ON  (눌러서 OFF)', 800, 13, r.w - 50);
+        ctx.fillText('자동 급유 ON  (눌러서 OFF)', r.x + r.w/2 + 8, r.y + r.h/2 + 1);
         ctx.textBaseline = 'alphabetic';
-        ctx.fillText('자동 급유 ON  (눌러서 OFF)', r.x + r.w/2 + 8, r.y + r.h/2 + 5);
         
         /* 진행 상태 표시 (트럭 상태에 따라) */
         let statusTxt = '';
@@ -1150,9 +1182,11 @@ function drawAutoBtn(ctx, r, on){
         ctx.setLineDash([]);
         
         ctx.fillStyle = '#fff'; 
-        ctx.font = "800 13px Pretendard"; 
         ctx.textAlign = 'center'; 
-        ctx.fillText('🔁 자동 급유  (연속 공급)', r.x + r.w/2, r.y + r.h/2 + 5);
+        ctx.textBaseline = 'middle';
+        fitFont(ctx, '🔁 자동 급유  (연속 공급)', 800, 13, r.w - 24);
+        ctx.fillText('🔁 자동 급유  (연속 공급)', r.x + r.w/2, r.y + r.h/2 + 1);
+        ctx.textBaseline = 'alphabetic';
     }
     
     ctx.restore();
