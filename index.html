@@ -55,15 +55,20 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     border-radius: 8px;
     color: #2070d0;
     text-align: center;
-    font-size: clamp(20px, 2.5vw, 30px);
+    padding: 0;
+    font-size: clamp(11px, 2.5vw, 30px);
+    line-height: 1;
     font-family: 'IBM Plex Mono', monospace;
     font-weight: 700;
     outline: none;
     z-index: 10;
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+    appearance: textfield;
     transition: border-color 0.3s, color 0.3s, background 0.3s;
 }
 #tempInp::-webkit-outer-spin-button,
-#tempInp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+#tempInp::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
 #tempInp:focus { box-shadow: 0 0 10px rgba(32, 112, 208, 0.5); }
 
 #linkBar {
@@ -130,7 +135,6 @@ body.modal-open .ov { pointer-events: auto; }
     .dg p { font-size: 14px; line-height: 1.62; margin-bottom: 14px; }
     .dg button { padding: 15px 20px; font-size: 16px; }
     #linkBar { left: 10px; right: 10px; bottom: 8px; gap: 8px; font-size: 10px; }
-    #tempInp { min-width: 60px; min-height: 46px; border-width: 3px; }
 }
 
 @media (max-width: 480px) and (orientation: portrait) {
@@ -142,7 +146,6 @@ body.modal-open .ov { pointer-events: auto; }
 
 @media (hover: none) and (pointer: coarse) {
     .dg button:hover { transform: none; box-shadow: 0 -10px 22px rgba(0,0,0,0.08); }
-    #tempInp { font-size: clamp(22px, 4vw, 34px); }
 }
 #zoomHint {
     position: fixed; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 30;
@@ -155,6 +158,30 @@ body.modal-open .ov { pointer-events: auto; }
 #zoomHint.show { opacity: 1; transform: translateY(0); }
 @media (max-width: 900px), (hover: none) and (pointer: coarse) {
     #zoomHint { opacity: .78; }
+}
+
+/* ═══ 세로 휴대폰: 위쪽 빈 공간에 가로 권장 안내 배너 (똑바로 표시) ═══ */
+#rotateBanner { display: none; }
+@media (orientation: portrait) and (max-width: 600px) {
+    #rotateBanner {
+        display: flex; align-items: center; gap: 10px; justify-content: center;
+        position: fixed; left: 12px; right: 12px; top: calc(14px + env(safe-area-inset-top));
+        z-index: 40; padding: 14px 16px; border-radius: 16px; text-align: left;
+        background: linear-gradient(135deg, rgba(255,136,40,0.16), rgba(20,30,45,0.92));
+        border: 1px solid rgba(255,136,40,0.45); color: #ffd9b3;
+        font-size: 14px; font-weight: 800; line-height: 1.45;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.45); backdrop-filter: blur(6px);
+    }
+    #rotateBanner .ri {
+        flex: 0 0 auto; font-size: 26px;
+        animation: rbspin 2.4s ease-in-out infinite;
+    }
+    body.light #rotateBanner { color: #8a4a00; background: linear-gradient(135deg, rgba(255,136,40,0.22), rgba(255,255,255,0.95)); }
+}
+@keyframes rbspin {
+    0%, 60%, 100% { transform: rotate(0deg); }
+    20% { transform: rotate(-90deg); }
+    40% { transform: rotate(-90deg); }
 }
 
 </style>
@@ -170,6 +197,7 @@ body.modal-open .ov { pointer-events: auto; }
     </div>
 </div>
 <div id="zoomHint">🔍 두 손가락으로 확대·축소 · 기기를 가로로 돌리면 더 크게 볼 수 있어요</div>
+<div id="rotateBanner"><span class="ri">📱</span><span>화면을 <b>가로로 돌리면</b> 실험이 크고 또렷하게 보여요</span></div>
 <div id="ov" class="ov">
     <div class="dg">
         <h2>🧪 원유의 분별 증류 가상실험</h2>
@@ -1231,7 +1259,6 @@ function setAppViewportHeight(){
 
 /* 뷰포트 변화(리사이즈/방향전환/키보드) 시 일괄 재배치 — 항상 정방향(업라이트) 유지 */
 function relayout(){
-  document.body.classList.remove('rotate-app');
   setAppViewportHeight();
   if(typeof setupCanvas === 'function') setupCanvas();
 }
